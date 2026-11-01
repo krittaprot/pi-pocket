@@ -7,26 +7,97 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 /** Where shared things wait until the page picks them up; see `web/share.js`. */
 const SHARE_CACHE = "pocket-share";
 
-/**
- * The icon for a notification: the app icon this browser chose in Appearance. The server's manifest follows the icon
- * cookies (`src/server/http/icon-route.ts`), so it is asked at the time: a worker stops when idle and keeps nothing.
- * Its first icon is a 192 px PNG, which every system shows (macOS does not show an SVG one).
- */
-async function notificationIcon() {
-    try {
-        const response = await fetch("/manifest.webmanifest", { credentials: "same-origin" });
-        const src = (await response.json()).icons?.find(
-            (icon) => icon.type === "image/png" && icon.purpose !== "maskable",
-        )?.src;
+/** Where the notification icon last resolved to waits between pushes: a worker stops when idle and keeps no variables. */
+const ICON_CACHE = "pocket-notification-icon";
+const ICON_ENTRY = "/notification-icon";
+/** A PNG every system shows: macOS cannot show an SVG notification icon. */
+const FALLBACK_ICON = "/icon-192.png";
+/** The monochrome mark systems draw small, in the status bar and beside the app's name. */
+const BADGE = "/badge-96.png";
+/** A push waits no longer than this for the manifest: a slow server must not hold the notification. */
+const ICON_TIMEOUT_MS = 1500;
 
-        if (typeof src === "string" && src.startsWith("/")) {
+/** What `work` gives, or undefined after `ms`. */
+function within(work, ms = ICON_TIMEOUT_MS) {
+    let timer;
+
+    return Promise.race([
+        work,
+        new Promise((resolve) => {
+            timer = setTimeout(() => resolve(undefined), ms);
+        }),
+    ]).finally(() => clearTimeout(timer));
+}
+
+/** The icon URL the last push resolved, if it is still kept. */
+async function cachedIcon() {
+    try {
+        const cache = await caches.open(ICON_CACHE);
+        const response = await cache.match(ICON_ENTRY);
+        const src = response === undefined ? "" : (await response.text()).trim();
+
+        if (src.startsWith("/")) {
             return src;
         }
     } catch {
-        // The app's own icon below.
+        // Ask the manifest below.
     }
 
-    return "/icon.svg";
+    return undefined;
+}
+
+/**
+ * Ask the manifest for its icon, and keep the answer for the next push. The server's manifest follows the icon cookies
+ * (`src/server/http/icon-route.ts`), so it is asked rather than assumed: the person picks the icon in Appearance. The
+ * answer is its first PNG icon, which every system shows.
+ */
+async function rememberIcon() {
+    let src;
+
+    try {
+        const response = await within(
+            fetch("/manifest.webmanifest", { credentials: "same-origin" }),
+        );
+
+        src = (await response.json()).icons?.find(
+            (icon) => icon.type === "image/png" && icon.purpose !== "maskable",
+        )?.src;
+    } catch {
+        return undefined;
+    }
+
+    if (typeof src !== "string" || !src.startsWith("/")) {
+        return undefined;
+    }
+
+    try {
+        const cache = await caches.open(ICON_CACHE);
+
+        await cache.put(
+            ICON_ENTRY,
+            new Response(src, { headers: { "content-type": "text/plain" } }),
+        );
+    } catch {
+        // Not kept: the next push asks again.
+    }
+
+    return src;
+}
+
+/**
+ * The notification's icon, and the work that keeps it current. The last one resolved shows at once, while the manifest
+ * is asked again in the background; with none, it is asked now, for at most `ICON_TIMEOUT_MS`, then the PNG fallback.
+ */
+async function notificationIcon() {
+    const cached = await cachedIcon();
+
+    if (cached !== undefined) {
+        return { icon: cached, refresh: rememberIcon() };
+    }
+
+    const refresh = rememberIcon();
+
+    return { icon: (await refresh) ?? FALLBACK_ICON, refresh };
 }
 
 self.addEventListener("push", (event) => {
@@ -49,16 +120,19 @@ self.addEventListener("push", (event) => {
 
     event.waitUntil(
         Promise.all([
-            notificationIcon().then((icon) =>
-                self.registration.showNotification(data.title || "Pi Pocket", {
+            notificationIcon().then(async ({ icon, refresh }) => {
+                await self.registration.showNotification(data.title || "Pi Pocket", {
                     body: data.body || "",
                     tag: data.tag,
                     renotify: Boolean(data.tag),
                     icon,
+                    badge: BADGE,
                     actions,
                     data: { url: data.url || "/", approval },
-                }),
-            ),
+                });
+                // Kept for the next push; the notification already shows.
+                await refresh;
+            }),
             // A dot on the home-screen icon; the app sets the real count once it opens.
             self.navigator.setAppBadge?.().catch(() => {}),
         ]),
@@ -90,38 +164,55 @@ async function answerApproval(approval, allow, data) {
         return;
     }
 
+    const { icon, refresh } = await notificationIcon();
+
     await self.registration.showNotification(`Could not ${allow ? "allow" : "deny"} the call`, {
         body: problem,
-        icon: await notificationIcon(),
+        icon,
+        badge: BADGE,
         data: { url: data.url },
     });
+    await refresh;
+}
+
+/**
+ * The window a notification's link goes to: the one already showing that path and query, otherwise any window of the
+ * app. Another one still gets there in place (`pocket.navigate`), so what is typed in it is not lost.
+ */
+function windowFor(windows, url) {
+    const target = new URL(url);
+    const same = windows.filter((client) => new URL(client.url).origin === target.origin);
+    const here = same.find((client) => {
+        const at = new URL(client.url);
+
+        return at.pathname === target.pathname && at.search === target.search;
+    });
+
+    return here ?? same[0];
 }
 
 async function openUrl(url) {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+    const open = windowFor(windows, url);
+    const target = new URL(url);
+
+    if (open === undefined) {
+        await self.clients.openWindow(url);
+
+        return;
+    }
+
+    await open.focus();
 
     // PiP's notifications open its panel over whatever the window shows, rather than take the window elsewhere.
-    if (open && new URL(url).searchParams.has("pip")) {
-        await open.focus();
+    if (target.searchParams.has("pip")) {
         open.postMessage({ type: "pocket.pip" });
 
         return;
     }
 
-    if (open) {
-        await open.focus();
-
-        try {
-            await open.navigate(url);
-
-            return;
-        } catch {
-            // Not controlled by this worker yet: open a new window instead.
-        }
-    }
-
-    await self.clients.openWindow(url);
+    // The app's own router goes there: a full load would lose what the person has typed (`pip.js`).
+    open.postMessage({ type: "pocket.navigate", url: target.href });
 }
 
 self.addEventListener("notificationclick", (event) => {

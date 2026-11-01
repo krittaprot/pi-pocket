@@ -1,6 +1,6 @@
 // Phone notifications: this device subscribes to the server's pushes, and each person picks what they hear about.
 import { useEffect, useState } from "preact/hooks";
-import { api, attempt, closeSheet, notify, sessionUnread } from "./store.js";
+import { api, attempt, closeSheet, notify, sessionUnread, store } from "./store.js";
 import { html, Loader, Sheet, Switch } from "./ui.js";
 
 const supported =
@@ -58,6 +58,77 @@ export function updateBadge(state) {
     badged = count;
     (count === 0 ? navigator.clearAppBadge() : navigator.setAppBadge(count)).catch(() => {});
 }
+
+// ─── Calls answered elsewhere ───────────────────────────────────────────────────────
+
+/**
+ * The approval ids each list last named waiting: the open session's view (its own calls and its subagents'), and each
+ * session's peek. A call that leaves a list was allowed, denied, or withdrawn: its notification goes with it, rather
+ * than offer an answer the server no longer asks for.
+ */
+const waitingCalls = new Map();
+
+/**
+ * An approval id in a notification: its payload's (`data.approval`), else its tag (`approval-<id>`, which `alerts.ts`
+ * gives a form's approval too, though its payload carries none).
+ */
+const approvalOf = (notification) =>
+    notification.data?.approval?.id ?? /^approval-(.+)$/.exec(notification.tag ?? "")?.[1];
+
+/** Close the notifications of calls whose ids are in `gone`. */
+function closeNotifications(gone) {
+    if (gone.size === 0 || !("serviceWorker" in navigator)) {
+        return;
+    }
+
+    navigator.serviceWorker.ready
+        .then((registration) => registration.getNotifications())
+        .then((notifications) => {
+            for (const notification of notifications) {
+                if (gone.has(approvalOf(notification))) {
+                    notification.close();
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+/** The approval ids a peek or a view names waiting. */
+const waitingIn = (approvals) =>
+    new Set((Array.isArray(approvals) ? approvals : []).map((approval) => approval.id));
+
+/** Follow the wait lists and close the notifications of calls that have left them. */
+export function closeAnsweredApprovals(state) {
+    const lists = new Map();
+    const view = state.view;
+
+    if (view?.conversation?.id !== undefined) {
+        lists.set(`view:${view.conversation.id}`, waitingIn(view.approvals));
+    }
+
+    for (const [id, peek] of Object.entries(state.peeks ?? {})) {
+        lists.set(`peek:${id}`, waitingIn(peek?.approvals));
+    }
+
+    // A list that is still there and still names a call says it waits, whatever another list has missed.
+    const present = new Set([...lists.values()].flatMap((ids) => [...ids]));
+    const gone = new Set();
+
+    for (const [list, ids] of lists) {
+        for (const id of waitingCalls.get(list) ?? []) {
+            if (!present.has(id)) {
+                gone.add(id);
+            }
+        }
+
+        waitingCalls.set(list, ids);
+    }
+
+    closeNotifications(gone);
+}
+
+// A call answered elsewhere (another tab, another person, or its notification) is no longer offered here.
+store.subscribe(closeAnsweredApprovals);
 
 function keyBytes(base64url) {
     const base64 = base64url

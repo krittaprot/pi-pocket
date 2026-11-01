@@ -163,8 +163,48 @@ store.subscribe((state) => {
 navigator.serviceWorker?.addEventListener("message", (event) => {
     if (event.data?.type === "pocket.pip") {
         openPip();
+    } else if (event.data?.type === "pocket.navigate") {
+        openFromNotification(event.data.url);
     }
 });
+
+/**
+ * A notification tapped while a window is open: its link opens in the app, without a reload, so a draft survives
+ * (`sw.js` sends `pocket.navigate`). Session links go through the router as a row does, with the chat a chat
+ * notification asks for; the app's other pages are loaded. Anything of another origin is not opened from here.
+ */
+function openFromNotification(url) {
+    let target;
+
+    try {
+        target = new URL(url, location.href);
+    } catch {
+        return;
+    }
+
+    if (target.origin !== location.origin) {
+        return;
+    }
+
+    const session = /^\/s\/(\d+)\/?$/.exec(target.pathname);
+
+    if (session) {
+        navigate(Number(session[1]), {
+            sheet: target.searchParams.has("chat") ? { type: "chat" } : null,
+        });
+
+        return;
+    }
+
+    if (target.pathname === "/") {
+        navigate(null);
+
+        return;
+    }
+
+    // An extension's page, a join link, or another page the router does not know: it takes a load.
+    location.assign(target.href);
+}
 
 /** PiP's answers seen up to now: what the panel last showed, by the server's clock. */
 function markSeen() {
