@@ -1,6 +1,6 @@
 // What the server tests share: an isolated Pi install and data folder, a scripted model, and small helpers. Import
 // this before anything from src/: it points Pi's config at a temporary folder first.
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -14,7 +14,9 @@ import type { Client } from "../src/server/room.ts";
 
 export const context = BACKGROUND_CONTEXT;
 
-export const root = mkdtempSync(join(tmpdir(), "pi-pocket-test-"));
+// Resolved once: on macOS the temp folder is under /var, which is a link to /private/var, and the app reports the real
+// path in the folders it hands out. Comparing that with an unresolved one would fail on this machine alone.
+export const root = realpathSync(mkdtempSync(join(tmpdir(), "pi-pocket-test-")));
 // Isolate from the real Pi install: its auth, settings, skills, and Lancet Guard.
 process.env.PI_CODING_AGENT_DIR = join(root, "agent");
 process.env.PI_POCKET_GUARD = "off";

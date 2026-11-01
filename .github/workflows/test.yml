@@ -1,0 +1,39 @@
+# Runs the checks and the whole test suite on every push and pull request. The UI tests drive a real
+# Chromium through src/server/browser/discovery.ts, which also finds Playwright's own download.
+name: Test
+
+on:
+    push:
+    pull_request:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: test-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version: 24
+                  cache: npm
+            - name: Install
+              run: npm ci
+            - name: Install Chromium for the browser tests
+              run: npx --yes playwright@1 install --with-deps chromium
+            - name: Type-check
+              run: npm run check
+            - name: Lint
+              run: npm run lint
+            - name: Check formatting
+              run: npx prettier --check .
+            - name: Test
+              run: npm test

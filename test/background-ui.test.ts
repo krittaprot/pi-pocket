@@ -26,8 +26,14 @@ import { VIEWPORTS } from "../src/server/browser/viewport.ts";
 import { createHandler } from "../src/server/http.ts";
 
 const chromium = findBrowser();
+// Background tasks follow their processes through /proc: elsewhere there is nothing to follow.
 const real = {
-    skip: chromium === undefined ? "no Chromium-based browser on this machine" : false,
+    skip:
+        chromium === undefined
+            ? "no Chromium-based browser on this machine"
+            : process.platform === "linux"
+              ? false
+              : "background tasks need Linux: they follow their processes through /proc",
 } as const;
 
 /** The owner asks for a background task (`start a background task: <command>`); everything else answers "done". */
@@ -61,7 +67,7 @@ const see = (script: string, what: string, timeoutMs = 10_000) =>
     until(async () => (await inPage<boolean>(script)) === true, what, timeoutMs);
 
 before(async () => {
-    if (chromium === undefined) {
+    if (real.skip) {
         return;
     }
 
