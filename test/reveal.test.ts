@@ -42,7 +42,13 @@ const twoCommands = revealCommands("/a/b.txt", false, process.platform).length >
 
 test(
     "the first command that works wins",
-    { skip: twoCommands ? false : "one file manager command on this platform" },
+    {
+        skip: !twoCommands
+            ? "one file manager command on this platform"
+            : hasDesktop()
+              ? false
+              : "no desktop to show a file on",
+    },
     async () => {
         const folder = mkdtempSync(join(tmpdir(), "reveal-"));
         const file = join(folder, "notes.txt");

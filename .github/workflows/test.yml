@@ -36,7 +36,8 @@ jobs:
             - name: Check formatting
               run: npx prettier --check .
             - name: Test
-              run: npm test
+              # Two files at a time: the runner has two cores, and the UI tests wait on real time.
+              run: node --test --test-concurrency=2 test/*.test.ts
               env:
                   # As docker/Dockerfile runs it: a runner's small /dev/shm and its user-namespace sandbox close Chromium
                   # partway through the UI tests otherwise.
