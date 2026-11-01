@@ -1621,7 +1621,14 @@ test("Pi's question shows its answers as buttons a thumb can tap", real, async (
 // Issue #131: a phone on its side with a notch. Another Chromium fakes the safe-area insets on its own page.
 test(
     "with a notch, the rail, the top bar, and the message box clear it; with none, nothing moves",
-    real,
+    {
+        // Playwright's Linux Chromium closes on Emulation.setSafeAreaInsetsOverride, before the page loads: CI alone.
+        skip:
+            real.skip ||
+            (process.env.CI !== undefined && process.platform === "linux"
+                ? "this Chromium closes on Emulation.setSafeAreaInsetsOverride"
+                : false),
+    },
     async (t) => {
         const WIDTH = 844;
         const NOTCH = 47;
