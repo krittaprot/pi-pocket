@@ -158,21 +158,6 @@ function setLink(rel, href, type) {
 }
 
 /**
- * The service worker shows notifications with an icon of its own: tell it the design's. A worker that installs after this
- * page was opened has no controller yet, so the ready worker is told too, and one that starts again gets it on the next
- * change, which is soon enough for a notification's picture.
- */
-function tellWorker(design) {
-    const href = design.id === "original" ? "/icon-192.png" : `/icons/${design.id}/icon-192.png`;
-    const message = { type: "icon", href };
-
-    navigator.serviceWorker?.controller?.postMessage(message);
-    navigator.serviceWorker?.ready
-        .then((ready) => ready.active?.postMessage(message))
-        .catch(() => {});
-}
-
-/**
  * A phone fetches the page and the icon in a session of its own, with no cookie: the owner's browser tells the server the
  * colors and the design too (`reportIconsAs`). Not awaited; a failure only leaves the cookie's own.
  */
@@ -242,7 +227,6 @@ export function applyIcons(vars, id = "original") {
         design.id === "original" ? "" : design.id,
         design.id === "original" ? 0 : 31536000,
     );
-    tellWorker(design);
 
     if (reports) {
         void reportToServer(colorsInUse, design.id === "original" ? null : design.id);

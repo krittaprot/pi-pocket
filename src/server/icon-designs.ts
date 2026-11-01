@@ -56,7 +56,8 @@ export function iconDesign(web: string, id: unknown): IconDesign | null {
             { src: url("icon-192.png"), sizes: "192x192", type: "image/png" },
             { src: url("icon-512.png"), sizes: "512x512", type: "image/png" },
             {
-                src: url("icon-maskable-512.png"),
+                // The version makes a browser fetch it again: the art filled the whole square from version 2.
+                src: `${url("icon-maskable-512.png")}?v=2`,
                 sizes: "512x512",
                 type: "image/png",
                 purpose: "maskable",

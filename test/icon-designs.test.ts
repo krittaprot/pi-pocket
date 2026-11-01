@@ -54,7 +54,7 @@ test("a design has the tab's icon, the home screen's, and the sizes iOS and Andr
             ["/icons/light/icon.svg", "any", undefined],
             ["/icons/light/icon-192.png", "192x192", undefined],
             ["/icons/light/icon-512.png", "512x512", undefined],
-            ["/icons/light/icon-maskable-512.png", "512x512", "maskable"],
+            ["/icons/light/icon-maskable-512.png?v=2", "512x512", "maskable"],
         ],
     );
 });
@@ -97,7 +97,7 @@ test("the manifest lists the design's files when the cookie names one", () => {
             "/icons/icon-dark/icon.svg",
             "/icons/icon-dark/icon-192.png",
             "/icons/icon-dark/icon-512.png",
-            "/icons/icon-dark/icon-maskable-512.png",
+            "/icons/icon-dark/icon-maskable-512.png?v=2",
         ],
         "the design wins over the colors",
     );

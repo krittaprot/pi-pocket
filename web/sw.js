@@ -8,22 +8,26 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 const SHARE_CACHE = "pocket-share";
 
 /**
- * The icon this page chose for its notifications (`web/app-icon.js` posts it), else the app's own. A worker restarts
- * without the page, so a design's icon is told again on every load.
+ * The icon for a notification: the app icon this browser chose in Appearance. The server's manifest follows the icon
+ * cookies (`src/server/http/icon-route.ts`), so it is asked at the time: a worker stops when idle and keeps nothing.
+ * Its first icon is a 192 px PNG, which every system shows (macOS does not show an SVG one).
  */
-let notificationIcon = "/icon.svg";
+async function notificationIcon() {
+    try {
+        const response = await fetch("/manifest.webmanifest", { credentials: "same-origin" });
+        const src = (await response.json()).icons?.find(
+            (icon) => icon.type === "image/png" && icon.purpose !== "maskable",
+        )?.src;
 
-self.addEventListener("message", (event) => {
-    const { type, href } = event.data ?? {};
-
-    if (
-        type === "icon" &&
-        typeof href === "string" &&
-        /^(\/icons\/[a-z0-9-]+\/)?icon-192\.png$/.test(href)
-    ) {
-        notificationIcon = href;
+        if (typeof src === "string" && src.startsWith("/")) {
+            return src;
+        }
+    } catch {
+        // The app's own icon below.
     }
-});
+
+    return "/icon.svg";
+}
 
 self.addEventListener("push", (event) => {
     let data = {};
@@ -45,14 +49,16 @@ self.addEventListener("push", (event) => {
 
     event.waitUntil(
         Promise.all([
-            self.registration.showNotification(data.title || "Pi Pocket", {
-                body: data.body || "",
-                tag: data.tag,
-                renotify: Boolean(data.tag),
-                icon: notificationIcon,
-                actions,
-                data: { url: data.url || "/", approval },
-            }),
+            notificationIcon().then((icon) =>
+                self.registration.showNotification(data.title || "Pi Pocket", {
+                    body: data.body || "",
+                    tag: data.tag,
+                    renotify: Boolean(data.tag),
+                    icon,
+                    actions,
+                    data: { url: data.url || "/", approval },
+                }),
+            ),
             // A dot on the home-screen icon; the app sets the real count once it opens.
             self.navigator.setAppBadge?.().catch(() => {}),
         ]),
@@ -86,7 +92,7 @@ async function answerApproval(approval, allow, data) {
 
     await self.registration.showNotification(`Could not ${allow ? "allow" : "deny"} the call`, {
         body: problem,
-        icon: notificationIcon,
+        icon: await notificationIcon(),
         data: { url: data.url },
     });
 }
