@@ -40,6 +40,11 @@ const DEFAULTS = {
     theme: "desktop",
     /** The theme: a theme folder's id, or "pocket", the app's own look. */
     look: BASE_LOOK,
+    /**
+     * The app's icon, a design of `app-icon.js`: "original" draws it in the colors in use, and any other is the files of
+     * `web/icons/<id>/`. The tab's icon and this device's notifications change; a home screen keeps what it was added with.
+     */
+    iconDesign: "original",
     /** Wide screens: the sidebar and the conversation as Hyprland windows, with gaps and borders. */
     tiling: true,
     /** The desktop's wallpaper in the gaps, when following the desktop. */
@@ -646,7 +651,7 @@ export function apply() {
     Object.assign(root.dataset, attrs);
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", vars["--o-bg"]);
     document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", attrs.mode);
-    applyIcons(vars);
+    applyIcons(vars, p.iconDesign);
     // In safe mode, or before the list, the theme's stylesheets stay as the cache has them, for the next load.
     const css = sheets === null || safeMode() ? (cached.css ?? []) : sheets;
     const fonts = sheets === null || safeMode() ? (cached.fonts ?? []) : (lookOf()?.fonts ?? []);

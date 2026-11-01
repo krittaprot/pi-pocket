@@ -29,7 +29,8 @@ import { browserRoutes } from "./browser-routes.ts";
 import { conversationRoutes } from "./conversation-routes.ts";
 import { createEventStreams, keptPart } from "./events.ts";
 import { extensionRoute } from "./extension-routes.ts";
-import { isIconColors, storeIconColors } from "../icon-store.ts";
+import { isIconColors, storeIcon } from "../icon-store.ts";
+import { isIconDesignId } from "../icon-designs.ts";
 import {
     type ApiRequest,
     conversationId,
@@ -426,17 +427,27 @@ export function createApi(options: HttpOptions, auth: Auth) {
 
         // Theme folders (`themes.ts`): everyone signed in lists them, as everyone chooses one for their own browsers;
         // only the owner adds, edits, and removes them.
-        // The app icon's colors, which the owner's browser reports for the requests that carry no cookie (`icon-store.ts`).
+        // The app icon's colors and design, which the owner's browser reports for the requests that carry no cookie
+        // (`icon-store.ts`).
         if (first === "app-icon" && second === undefined && method === "PUT") {
             requireOwner(user);
 
-            const { colors } = await readJson<{ colors?: unknown }>(request);
+            const { colors, design } = await readJson<{ colors?: unknown; design?: unknown }>(
+                request,
+            );
 
             if (!isIconColors(colors)) {
                 throw new HttpError(400, "Colors are five hex colors joined by dots");
             }
 
-            storeIconColors(app.dataDir, colors);
+            const picked =
+                design === undefined || design === null || design === "original" ? null : design;
+
+            if (picked !== null && !isIconDesignId(picked)) {
+                throw new HttpError(400, 'A design is a folder name, or "original"');
+            }
+
+            storeIcon(app.dataDir, colors, picked);
 
             return json(response, 200, { ok: true });
         }

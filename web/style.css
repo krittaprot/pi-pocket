@@ -12008,6 +12008,53 @@ textarea.notes {
 }
 
 /* The theme: a card for each theme folder, in the app's own colors (a theme cannot be drawn small, as colors can). */
+/* Appearance's App icon: each design as a browser tab draws it, with the name under it. */
+.icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 10px;
+}
+
+.icon-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: var(--r-card);
+    background: var(--card);
+    border: 1px solid var(--hair-2);
+    transition: border-color var(--t-hover) var(--ease-out);
+}
+
+@media (hover: hover) {
+    .icon-card:hover {
+        border-color: var(--accent-line);
+    }
+}
+
+.icon-card:active {
+    transform: scale(0.97);
+}
+
+.icon-card.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.icon-card-art {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    border: 1px solid var(--hair);
+}
+
+.icon-card-name {
+    font-size: 12px;
+    color: var(--text);
+    text-align: center;
+}
+
 .look-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

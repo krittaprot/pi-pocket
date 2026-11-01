@@ -1,8 +1,10 @@
 /** `/app-icon.png?frame=&card=&ring1=&ring2=&pi=&size=&maskable=1`: the app icon in those colors (hex, no `#`), as `icon-render.ts` draws it. */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../errors.ts";
-import { storedIconColors } from "../icon-store.ts";
+import { iconDesign } from "../icon-designs.ts";
+import { storedIcon } from "../icon-store.ts";
 import { APP_ICON, type IconColors, MIN_ICON, renderIcon } from "../icon-render.ts";
+import { WEB } from "./assets.ts";
 
 /** The largest icon the route draws: no sign-in is needed, and the drawing runs on the main thread. */
 const MAX_SIZE = 192;
@@ -103,9 +105,25 @@ const COOKIE = new RegExp(`(?:^|;\\s*)pocket_icon=(${HEX}(?:\\.${HEX}){4})(?:;|$
 function cookieColors(request: IncomingMessage, dataDir: string): string[] | null {
     return (
         COOKIE.exec(request.headers.cookie ?? "")?.[1]?.split(".") ??
-        storedIconColors(dataDir) ??
+        storedIcon(dataDir).colors ??
         null
     );
+}
+
+const DESIGN_COOKIE = "pocket_icon_design";
+const DESIGN = new RegExp(
+    `(?:^|;\\s*)${DESIGN_COOKIE}=([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:;|$)`,
+    "i",
+);
+
+/**
+ * The design in this browser's cookie (`pocket_icon_design`, which `web/app-icon.js` keeps), or the owner's, or null for
+ * the app's own icon. A design whose folder is gone is null too, so the app's own icon shows.
+ */
+function designFor(request: IncomingMessage, dataDir: string): ReturnType<typeof iconDesign> {
+    const id = DESIGN.exec(request.headers.cookie ?? "")?.[1] ?? storedIcon(dataDir).design;
+
+    return iconDesign(WEB, id ?? "");
 }
 
 /** The icon for a request with no cookie, as a phone's own fetch of the icon is: the owner's colors, else the file. */
@@ -159,9 +177,20 @@ const address = (colors: string[], size: number, maskable = false) => {
  * as served, so the page carries it.
  */
 export function iconAddress(request: IncomingMessage, dataDir: string): string | null {
+    const design = designFor(request, dataDir);
+
+    if (design !== null) {
+        return design.touch;
+    }
+
     const colors = cookieColors(request, dataDir);
 
     return colors === null ? null : address(colors, 180);
+}
+
+/** The tab's icon for the design in the cookie, or null for the page's own (`web/icon.svg`). */
+export function tabAddress(request: IncomingMessage, dataDir: string): string | null {
+    return designFor(request, dataDir)?.tab ?? null;
 }
 
 /**
@@ -173,6 +202,15 @@ export function manifestFor(
     file: string,
     dataDir: string,
 ): string | null {
+    const design = designFor(request, dataDir);
+
+    if (design !== null) {
+        return JSON.stringify({
+            ...(JSON.parse(file) as Record<string, unknown>),
+            icons: design.icons,
+        });
+    }
+
     const colors = cookieColors(request, dataDir);
 
     if (colors === null) {

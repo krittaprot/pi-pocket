@@ -239,7 +239,11 @@ function preloads(imports: Record<string, string>): string[] {
 }
 
 /** The app page, with its content security policy, and the modules it loads listed for the browser to fetch at once. */
-export function serveApp(response: ServerResponse, icon: string | null = null): void {
+export function serveApp(
+    response: ServerResponse,
+    icon: string | null = null,
+    tab: string | null = null,
+): void {
     let body: string;
 
     try {
@@ -250,11 +254,20 @@ export function serveApp(response: ServerResponse, icon: string | null = null): 
         return;
     }
 
-    // The home-screen icon in the colors this browser chose, in the page as it is served (`http/icon-route.ts`).
+    // The icon of the design this browser chose: the tab's in the page as it is served, so a reload never flashes
+    // another one, and the home screen's in the colors or the design that browser chose (`http/icon-route.ts`).
     if (icon !== null) {
         body = body.replace(
             '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />',
             () => `<link rel="apple-touch-icon" href="${icon}" />`,
+        );
+    }
+
+    if (tab !== null) {
+        body = body.replace(
+            '<link rel="icon" href="/icon.svg" type="image/svg+xml" />',
+            () =>
+                `<link rel="icon" href="${tab}" type="${tab.endsWith(".svg") ? "image/svg+xml" : "image/png"}" />`,
         );
     }
 

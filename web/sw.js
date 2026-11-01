@@ -7,6 +7,24 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 /** Where shared things wait until the page picks them up; see `web/share.js`. */
 const SHARE_CACHE = "pocket-share";
 
+/**
+ * The icon this page chose for its notifications (`web/app-icon.js` posts it), else the app's own. A worker restarts
+ * without the page, so a design's icon is told again on every load.
+ */
+let notificationIcon = "/icon.svg";
+
+self.addEventListener("message", (event) => {
+    const { type, href } = event.data ?? {};
+
+    if (
+        type === "icon" &&
+        typeof href === "string" &&
+        /^(\/icons\/[a-z0-9-]+\/)?icon-192\.png$/.test(href)
+    ) {
+        notificationIcon = href;
+    }
+});
+
 self.addEventListener("push", (event) => {
     let data = {};
 
@@ -31,7 +49,7 @@ self.addEventListener("push", (event) => {
                 body: data.body || "",
                 tag: data.tag,
                 renotify: Boolean(data.tag),
-                icon: "/icon.svg",
+                icon: notificationIcon,
                 actions,
                 data: { url: data.url || "/", approval },
             }),
@@ -68,7 +86,7 @@ async function answerApproval(approval, allow, data) {
 
     await self.registration.showNotification(`Could not ${allow ? "allow" : "deny"} the call`, {
         body: problem,
-        icon: "/icon.svg",
+        icon: notificationIcon,
         data: { url: data.url },
     });
 }

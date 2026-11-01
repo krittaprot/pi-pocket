@@ -32,6 +32,7 @@ import {
     STEP_TEXT,
 } from "../theme.js";
 import { arranged, move, resetSlot, setShown, SLOTS } from "../slots.js";
+import { DESIGNS } from "../app-icon.js";
 import { html, Icon, Sheet, Switch } from "../ui.js";
 import { galleryAvailable } from "./gallery.js";
 
@@ -615,6 +616,24 @@ function SlotLayout({ slot }) {
         </div>`;
 }
 
+/**
+ * An icon design as a card: the art as a browser tab and a home screen show it, and its name. Choosing one puts it on the
+ * page at once (`applyIcons`); the choice is this browser's, as every Appearance setting is.
+ */
+function DesignCard({ design }) {
+    const on = (prefs().iconDesign ?? "original") === design.id;
+
+    return html`<button
+        class=${`icon-card ${on ? "on" : ""}`}
+        aria-pressed=${on}
+        title=${design.detail}
+        onClick=${() => setPrefs({ iconDesign: design.id })}
+    >
+        <img class="icon-card-art" src=${design.thumb} alt="" width="64" height="64" loading="lazy" />
+        <span class="icon-card-name">${design.name}</span>
+    </button>`;
+}
+
 export function AppearanceSheet() {
     const p = prefs();
     const desktop = store.state.desktopTheme;
@@ -637,6 +656,14 @@ export function AppearanceSheet() {
         </div>
         ${store.state.me?.role === "owner" && html`<${ColorsTools} />`}
         ${store.state.me?.role === "owner" && html`<${DefaultTools} />`}
+        <div class="label">App icon</div>
+        <div class="icon-grid">
+            ${DESIGNS.map((design) => html`<${DesignCard} key=${design.id} design=${design} />`)}
+        </div>
+        <p class="muted small">
+            The tab's icon and this device's notifications change at once. A home screen keeps the icon it was added
+            with: add it again to change it.
+        </p>
         ${
             !desktop &&
             html`<p class="muted small">

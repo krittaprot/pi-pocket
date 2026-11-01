@@ -182,17 +182,17 @@ test("the manifest takes the icons and colors of the cookie, and is left alone w
 });
 
 test("the owner's colors serve a request with no cookie, and the cookie still wins", async () => {
-    const { storeIconColors, storedIconColors } = await import("../src/server/icon-store.ts");
+    const { storeIcon, storedIcon } = await import("../src/server/icon-store.ts");
     const { iconAddress, manifestFor } = await import("../src/server/http/icon-route.ts");
     const request = (cookie?: string) =>
         ({ headers: cookie === undefined ? {} : { cookie } }) as never;
 
-    assert.equal(storedIconColors(dataDir), null, "nothing stored yet");
+    assert.equal(storedIcon(dataDir).colors, null, "nothing stored yet");
     assert.equal(iconAddress(request(), dataDir), null);
 
-    storeIconColors(dataDir, "070707.000.b0b0b0.b6b6b6.b9b9b9");
+    storeIcon(dataDir, "070707.000.b0b0b0.b6b6b6.b9b9b9", null);
 
-    assert.deepEqual(storedIconColors(dataDir), ["070707", "000", "b0b0b0", "b6b6b6", "b9b9b9"]);
+    assert.deepEqual(storedIcon(dataDir).colors, ["070707", "000", "b0b0b0", "b6b6b6", "b9b9b9"]);
     assert.match(
         iconAddress(request(), dataDir)!,
         /frame=070707.*pi=b9b9b9/,
@@ -204,7 +204,12 @@ test("the owner's colors serve a request with no cookie, and the cookie still wi
         "a cookie wins",
     );
     assert.ok(manifestFor(request(), "{}", dataDir), "the manifest too");
-    assert.throws(() => storeIconColors(dataDir, "nope"), TypeError, "only colors are stored");
+    assert.throws(() => storeIcon(dataDir, "nope", null), TypeError, "only colors are stored");
+    assert.throws(
+        () => storeIcon(dataDir, "000.000.000.000.000", "Bogus!"),
+        TypeError,
+        "a design is a folder name",
+    );
 });
 
 test("the icon route draws no more than 192 pixels, and a size that is not a number is a 400", async () => {
