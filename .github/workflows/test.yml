@@ -37,3 +37,7 @@ jobs:
               run: npx prettier --check .
             - name: Test
               run: npm test
+              env:
+                  # As docker/Dockerfile runs it: a runner's small /dev/shm and its user-namespace sandbox close Chromium
+                  # partway through the UI tests otherwise.
+                  PI_POCKET_BROWSER_ARGS: --no-sandbox --disable-dev-shm-usage
