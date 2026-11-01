@@ -1,14 +1,16 @@
 // The app's icons: the tab's icon and the home-screen icon (`apple-touch-icon`, which iOS and Android's "add to home
 // screen" shortcut read). Appearance's App icon chooses between designs (`icon-designs.ts`).
 //
-// Original: the app's own icon, drawn here in the colors in use, and the server draws its home-screen PNG. The other
-// designs are the files in `web/icons/<id>/`. The web app manifest's icons follow the same cookies: the server answers
-// `/manifest.webmanifest` with them (`src/server/http/icon-route.ts`).
+// Original: the app's own icon, drawn here in its fixed charcoal colors, or in the colors in use when the person asks it
+// to match the theme; the server draws its home-screen PNG. The other designs are the folders the server lists at
+// `/api/icon-designs`. The web app manifest's icons follow the same cookies: the server answers `/manifest.webmanifest`
+// with them (`src/server/http/icon-route.ts`).
 
 const SIZE = 512;
 const APPLE = 180;
-// What a palette lacks keeps the app's own icon color.
-const DEFAULTS = {
+
+// The app's own icon, which "Match the theme's colors" leaves alone: the same colors as `APP_ICON` in icon-render.ts.
+export const ORIGINAL_COLORS = {
     "--o-bg": "#1a1b26",
     "--o-bg-darker": "#13141c",
     "--o-orange": "#ff9e64",
@@ -16,61 +18,7 @@ const DEFAULTS = {
     "--o-green": "#00ff99",
 };
 
-/**
- * The designs Appearance offers, in its order: the app's own icon, then a folder of ready-made files each. A design the
- * server does not have falls back to the app's own icon: the page asks for files that are not there otherwise.
- */
-export const DESIGNS = [
-    {
-        id: "original",
-        name: "Original",
-        detail: "The app's own icon, in the colors of the theme in use",
-        thumb: "/apple-touch-icon.png",
-    },
-    {
-        id: "light",
-        name: "Light",
-        detail: "A white tile with the π in ink",
-        thumb: "/icons/light/thumb.png",
-        tab: "/icons/light/icon.svg",
-        touch: "/icons/light/apple-touch-icon.png",
-    },
-    {
-        id: "icon-dark",
-        name: "Cards, ink",
-        detail: "A deck of cards on an ink tile",
-        thumb: "/icons/icon-dark/thumb.png",
-        tab: "/icons/icon-dark/icon.svg",
-        touch: "/icons/icon-dark/apple-touch-icon.png",
-    },
-    {
-        id: "icon-light",
-        name: "Cards, paper",
-        detail: "A deck of cards on a paper tile",
-        thumb: "/icons/icon-light/thumb.png",
-        tab: "/icons/icon-light/icon.svg",
-        touch: "/icons/icon-light/apple-touch-icon.png",
-    },
-    {
-        id: "pocket-dark",
-        name: "Pocket, ink",
-        detail: "The π inside a pocket, on an ink tile",
-        thumb: "/icons/pocket-dark/thumb.png",
-        tab: "/icons/pocket-dark/icon-192.png",
-        touch: "/icons/pocket-dark/apple-touch-icon.png",
-    },
-    {
-        id: "pocket-light",
-        name: "Pocket, paper",
-        detail: "The π inside a pocket, on a paper tile",
-        thumb: "/icons/pocket-light/thumb.png",
-        tab: "/icons/pocket-light/icon-192.png",
-        touch: "/icons/pocket-light/apple-touch-icon.png",
-    },
-];
-
-/** The design with `id`, or the app's own icon for one this app does not have. */
-export const designOf = (id) => DESIGNS.find((each) => each.id === id) ?? DESIGNS[0];
+const DEFAULTS = ORIGINAL_COLORS;
 
 /** The icon as SVG text, from the palette's variables (`themeVars`): the drawing of `icon.svg` in the palette's colors. */
 export function iconSvg(vars) {
@@ -90,6 +38,60 @@ export function iconSvg(vars) {
 }
 
 const svgUrl = (svg) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+
+/**
+ * The app's own icon as a card: its fixed charcoal colors, which is what it is unless the person asks it to match the
+ * theme. The other cards come from the server (`loadDesigns`).
+ */
+export const ORIGINAL_DESIGN = {
+    id: "original",
+    name: "Original",
+    detail: "The app's own π icon",
+    thumb: svgUrl(iconSvg(DEFAULTS)),
+    background: DEFAULTS["--o-bg"],
+};
+
+/**
+ * The designs the server has (`GET /api/icon-designs`), once loaded: empty until then, and kept after the first good
+ * answer. The app's own icon is not among them.
+ */
+let designs = [];
+let loading = null;
+
+/** The server's designs, loading them once. A failure leaves just the app's own icon, and is tried again next time. */
+export function loadDesigns() {
+    if (designs.length > 0) {
+        return Promise.resolve(designs);
+    }
+
+    if (loading !== null) {
+        return loading;
+    }
+
+    loading = fetch("/api/icon-designs")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body) => {
+            const list = Array.isArray(body)
+                ? body
+                : Array.isArray(body?.designs)
+                  ? body.designs
+                  : [];
+
+            designs = list.filter((each) => typeof each?.id === "string");
+
+            return designs;
+        })
+        .catch(() => designs)
+        .finally(() => {
+            loading = null;
+        });
+
+    return loading;
+}
+
+/** The design with `id`: the app's own, one the server listed, or null while the list is not here (or is gone). */
+export const designOf = (id) =>
+    id === "original" ? ORIGINAL_DESIGN : (designs.find((each) => each.id === id) ?? null);
 
 /**
  * A palette color as the server takes it: hex with no `#`, 3 or 6 digits. Its alpha is dropped (an icon is opaque), and a
@@ -180,6 +182,8 @@ async function reportToServer(colors, design) {
 }
 
 let applied = "";
+/** The last design asked for, while its files are still loading: a late answer does not undo a newer choice. */
+let asked = null;
 
 /** The colors in use, `frame.card.ring1.ring2.pi`, and whether this browser reports them: only the owner's may. */
 let colorsInUse = null;
@@ -192,43 +196,71 @@ export function reportIconsAs(owner) {
     reports = owner;
 
     if (owner && colorsInUse !== null) {
-        void reportToServer(colorsInUse, designInUse === "original" ? null : designInUse);
+        void reportToServer(colorsInUse, designInUse);
     }
 }
 
+const paletteKey = (vars) => Object.keys(DEFAULTS).map((name) => vars[name]);
+
 /**
- * Put the icons of `design` on the page: the tab's, and the home screen's. The app's own icon follows `vars`; a design is
- * the files of its folder. The same colors and design again do nothing.
+ * Put the icons of `design` on the page: the tab's, and the home screen's. The app's own icon follows `vars` only when
+ * `follows` is on; otherwise it keeps its charcoal colors. A design is the files of its folder. The same choice again
+ * does nothing.
  */
-export function applyIcons(vars, id = "original") {
-    const design = designOf(id);
-    const key = JSON.stringify([design.id, ...Object.keys(DEFAULTS).map((name) => vars[name])]);
+export function applyIcons(vars, id = "original", follows = false) {
+    const wanted = typeof id === "string" && id !== "" ? id : "original";
+    const design = designOf(wanted);
+
+    if (design === null) {
+        // The server's list is not here yet (or that design is gone): draw it once it is, or the app's own icon.
+        asked = wanted;
+        void loadDesigns().then((list) => {
+            if (asked !== wanted) {
+                return;
+            }
+
+            applied = "";
+            applyIcons(
+                vars,
+                list.some((each) => each.id === wanted) ? wanted : "original",
+                follows,
+            );
+        });
+
+        return;
+    }
+
+    const key =
+        design.id === "original"
+            ? JSON.stringify(["original", follows, follows ? paletteKey(vars) : "fixed"])
+            : JSON.stringify([design.id, design.tab, design.touch]);
 
     if (key === applied) {
         return;
     }
 
     applied = key;
+    asked = null;
 
     if (design.id === "original") {
-        setLink("icon", svgUrl(iconSvg(vars)), "image/svg+xml");
-        setLink("apple-touch-icon", homeIconUrl(vars));
+        // Off keeps the charcoal icon whatever theme is in use.
+        const colors = follows ? vars : DEFAULTS;
+
+        setLink("icon", svgUrl(iconSvg(colors)), "image/svg+xml");
+        setLink("apple-touch-icon", homeIconUrl(colors));
+        colorsInUse = cookieValue(colors);
     } else {
         setLink("icon", design.tab, design.tab.endsWith(".svg") ? "image/svg+xml" : "image/png");
         setLink("apple-touch-icon", design.touch);
+        colorsInUse = cookieValue(DEFAULTS);
     }
 
-    colorsInUse = cookieValue(vars);
     designInUse = design.id;
     keep(COOKIE, colorsInUse, 31536000);
-    // The app's own icon clears the design, so the page and the manifest of the next load are the colors' again.
-    keep(
-        DESIGN_COOKIE,
-        design.id === "original" ? "" : design.id,
-        design.id === "original" ? 0 : 31536000,
-    );
+    // The app's own icon is a choice of its own too: the server must not fall back to the owner's other design.
+    keep(DESIGN_COOKIE, design.id, 31536000);
 
     if (reports) {
-        void reportToServer(colorsInUse, design.id === "original" ? null : design.id);
+        void reportToServer(colorsInUse, design.id);
     }
 }

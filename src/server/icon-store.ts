@@ -5,8 +5,8 @@
  * It is one choice for the whole server: the last device of the owner that changes the icon sets it, and a browser with
  * no cookie (a guest's too) gets it. A browser with a cookie gets its own.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { isIconDesignId } from "./icon-designs.ts";
 
 const HEX = "(?:[0-9a-f]{3}|[0-9a-f]{6})";
@@ -18,7 +18,7 @@ export const isIconColors = (value: unknown): value is string =>
 export type StoredIcon = {
     /** The colors `icon-render.ts` draws the app's own icon in, or null for the app's own. */
     colors: string[] | null;
-    /** The design's id (`web/icons/<id>/`), or null for the app's own icon. */
+    /** The design's id (`web/icons/<id>/`, or the data folder's `icons/<id>/`), or null for the app's own icon. */
     design: string | null;
 };
 
@@ -73,10 +73,30 @@ export function storeIcon(dataDir: string, colors: unknown, design: unknown): vo
     }
 
     const icon: StoredIcon = { colors: colors.split("."), design: design as string | null };
-    const kept_ = storedIcon(dataDir);
+    const before = storedIcon(dataDir);
 
-    if (kept_.colors?.join(".") !== colors || kept_.design !== icon.design) {
-        writeFileSync(file(dataDir), `${JSON.stringify({ colors, design: icon.design })}\n`);
-        kept = { path: file(dataDir), icon };
+    if (before.colors?.join(".") === colors && before.design === icon.design) {
+        return;
     }
+
+    const path = file(dataDir);
+    // One step, through a hidden file renamed over it: a reader sees the old icon or the new one, never half of one.
+    const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${Date.now()}.tmp`);
+
+    try {
+        writeFileSync(temp, `${JSON.stringify({ colors, design: icon.design })}\n`, {
+            flag: "wx",
+        });
+        renameSync(temp, path);
+    } catch (error) {
+        try {
+            unlinkSync(temp);
+        } catch {
+            // The write itself failed: there is nothing to remove.
+        }
+
+        throw error;
+    }
+
+    kept = { path, icon };
 }

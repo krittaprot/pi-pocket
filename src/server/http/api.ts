@@ -24,13 +24,13 @@ import { MAX_AVATAR, readAvatar } from "../avatars.ts";
 import { HttpError } from "../errors.ts";
 import { desktopTheme, wallpaperFile } from "../omarchy.ts";
 import { runningBoard, runningNow } from "../running.ts";
-import { serveImage } from "./assets.ts";
+import { serveImage, WEB } from "./assets.ts";
 import { browserRoutes } from "./browser-routes.ts";
 import { conversationRoutes } from "./conversation-routes.ts";
 import { createEventStreams, keptPart } from "./events.ts";
 import { extensionRoute } from "./extension-routes.ts";
-import { isIconColors, storeIcon } from "../icon-store.ts";
-import { isIconDesignId } from "../icon-designs.ts";
+import { hasIconDesign, iconDesignList } from "../icon-designs.ts";
+import { isIconColors, storeIcon, storedIcon } from "../icon-store.ts";
 import {
     type ApiRequest,
     conversationId,
@@ -440,16 +440,28 @@ export function createApi(options: HttpOptions, auth: Auth) {
                 throw new HttpError(400, "Colors are five hex colors joined by dots");
             }
 
-            const picked =
-                design === undefined || design === null || design === "original" ? null : design;
+            // Only an explicit null or "original" clears the design: a report that leaves it out keeps it.
+            let picked: string | null;
 
-            if (picked !== null && !isIconDesignId(picked)) {
-                throw new HttpError(400, 'A design is a folder name, or "original"');
+            if (design === undefined) {
+                picked = storedIcon(app.dataDir).design;
+            } else if (design === null || design === "original") {
+                picked = null;
+            } else if (typeof design === "string" && hasIconDesign(WEB, app.dataDir, design)) {
+                picked = design;
+            } else {
+                throw new HttpError(400, "No such icon design");
             }
 
             storeIcon(app.dataDir, colors, picked);
 
             return json(response, 200, { ok: true });
+        }
+
+        // The designs Appearance offers (`icon-designs.ts`): everyone signed in lists them, as everyone chooses one for
+        // their own browsers.
+        if (first === "icon-designs" && second === undefined && method === "GET") {
+            return json(response, 200, iconDesignList(WEB, app.dataDir));
         }
 
         if (first === "themes" && second === undefined && method === "GET") {

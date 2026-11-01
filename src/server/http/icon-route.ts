@@ -1,13 +1,26 @@
-/** `/app-icon.png?frame=&card=&ring1=&ring2=&pi=&size=&maskable=1`: the app icon in those colors (hex, no `#`), as `icon-render.ts` draws it. */
+/**
+ * The icon surfaces: `/app-icon.png` draws the app's own icon in chosen colors; `/icons/<id>/<rev>/<file>` serves a
+ * design folder's files; `/apple-touch-icon.png`, the page, and `/manifest.webmanifest` follow the design and colors this
+ * browser chose (its cookies), else the owner's (`icon-store.ts`).
+ */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../errors.ts";
-import { iconDesign } from "../icon-designs.ts";
+import {
+    ICON_DESIGN_COOKIE,
+    type IconDesign,
+    iconDesignById,
+    iconDesignFile,
+    isIconDesignId,
+    MAX_ICON_FILE,
+    ORIGINAL_ICON,
+} from "../icon-designs.ts";
 import { storedIcon } from "../icon-store.ts";
 import { APP_ICON, type IconColors, MIN_ICON, renderIcon } from "../icon-render.ts";
 import { WEB } from "./assets.ts";
+import { readChecked, SVG_CSP } from "./io.ts";
 
 /** The largest icon the route draws: no sign-in is needed, and the drawing runs on the main thread. */
-const MAX_SIZE = 192;
+const MAX_SIZE = 512;
 const CACHE = 32;
 /** New drawings a second, for the whole server: a client that changes a color in each request never finds one kept. */
 const DRAWS_PER_SECOND = 8;
@@ -98,6 +111,13 @@ export function iconRoute(request: IncomingMessage, response: ServerResponse, ur
     response.end(request.method === "HEAD" ? undefined : png);
 }
 
+/** A cookie's value, as `web/app-icon.js` writes it: plain characters, no spaces. */
+function cookieValue(request: IncomingMessage, name: string): string | undefined {
+    const found = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(request.headers.cookie ?? "");
+
+    return found?.[1];
+}
+
 const HEX = "(?:[0-9a-f]{3}|[0-9a-f]{6})";
 const COOKIE = new RegExp(`(?:^|;\\s*)pocket_icon=(${HEX}(?:\\.${HEX}){4})(?:;|$)`, "i");
 
@@ -110,35 +130,133 @@ function cookieColors(request: IncomingMessage, dataDir: string): string[] | nul
     );
 }
 
-const DESIGN_COOKIE = "pocket_icon_design";
-const DESIGN = new RegExp(
-    `(?:^|;\\s*)${DESIGN_COOKIE}=([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:;|$)`,
-    "i",
-);
-
 /**
- * The design in this browser's cookie (`pocket_icon_design`, which `web/app-icon.js` keeps), or the owner's, or null for
- * the app's own icon. A design whose folder is gone is null too, so the app's own icon shows.
+ * The design in this browser's cookie (`pocket_icon_design`, which `web/app-icon.js` keeps), or the owner's, or null.
+ * The cookie's literal `original` is an explicit choice of the app's own icon: it does not fall back to the owner's
+ * design. A design whose folder is gone is null too, so the app's own icon shows.
  */
-function designFor(request: IncomingMessage, dataDir: string): ReturnType<typeof iconDesign> {
-    const id = DESIGN.exec(request.headers.cookie ?? "")?.[1] ?? storedIcon(dataDir).design;
+function designFor(request: IncomingMessage, dataDir: string): IconDesign | null {
+    const value = cookieValue(request, ICON_DESIGN_COOKIE);
 
-    return iconDesign(WEB, id ?? "");
+    if (value !== undefined) {
+        const id = value.trim();
+
+        if (id === ORIGINAL_ICON) {
+            return null;
+        }
+
+        if (isIconDesignId(id)) {
+            return iconDesignById(WEB, dataDir, id);
+        }
+    }
+
+    const stored = storedIcon(dataDir).design;
+
+    return stored === null ? null : iconDesignById(WEB, dataDir, stored);
 }
 
-/** The icon for a request with no cookie, as a phone's own fetch of the icon is: the owner's colors, else the file. */
+/** What a request's cookies choose: a design, else the colors to draw the app's own icon in (or neither). */
+export type IconChoice = { design: IconDesign | null; colors: string[] | null };
+
+/**
+ * The design and colors this request gets, read once: the page's links, the home-screen icon, and the manifest all use
+ * it (`http.ts`).
+ */
+export function iconChoice(request: IncomingMessage, dataDir: string): IconChoice {
+    return { design: designFor(request, dataDir), colors: cookieColors(request, dataDir) };
+}
+
+/** Write one design file, as it was scanned: a copy under the version in its address never goes stale. */
+function sendDesignFile(
+    request: IncomingMessage,
+    response: ServerResponse,
+    served: NonNullable<ReturnType<typeof iconDesignFile>>,
+): void {
+    const body = readChecked(served.stat, MAX_ICON_FILE);
+
+    response.writeHead(200, {
+        "content-type": served.type,
+        "content-length": body.length,
+        // Only under the version the files are now is the address immutable; an older one serves them as they are.
+        "cache-control": served.current
+            ? "public, max-age=31536000, immutable"
+            : "public, no-cache",
+        "x-content-type-options": "nosniff",
+        ...(served.type === "image/svg+xml" ? { "content-security-policy": SVG_CSP } : {}),
+    });
+    response.end(request.method === "HEAD" ? undefined : body);
+}
+
+/**
+ * `/icons/<id>/<file>` (a built-in design's plain address, which older pages use) and `/icons/<id>/<rev>/<file>` (every
+ * design's, with the version in the address).
+ */
+export function iconsRoute(
+    request: IncomingMessage,
+    response: ServerResponse,
+    parts: string[],
+    dataDir: string,
+): void {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+        response.setHeader("allow", "GET, HEAD");
+
+        throw new HttpError(405, "Files are only read");
+    }
+
+    const [id, second, third] = parts;
+    const name = parts.length === 2 ? second : parts.length === 3 ? third : undefined;
+    const rev = parts.length === 3 ? second : undefined;
+    const served =
+        id === undefined || name === undefined || parts.length > 3
+            ? undefined
+            : iconDesignFile(WEB, dataDir, id, rev, name);
+
+    // A data folder's design has only its versioned address: the plain one belongs to the app's own files.
+    if (served === undefined || (parts.length === 2 && !served.design.builtIn)) {
+        throw new HttpError(404, "Not found");
+    }
+
+    sendDesignFile(request, response, served);
+}
+
+/** The icon for a request with no cookie, as a phone's own fetch of the icon is: the design's, else the owner's colors. */
 export function appleTouchIcon(
     request: IncomingMessage,
     response: ServerResponse,
-    dataDir: string,
+    choice: IconChoice,
 ): boolean {
-    const colors = cookieColors(request, dataDir);
+    if (choice.design !== null) {
+        const stat = choice.design.files.get("apple-touch-icon.png");
 
-    if (colors === null) {
+        if (stat !== undefined) {
+            try {
+                const png = readChecked(stat, MAX_ICON_FILE);
+
+                response.writeHead(200, {
+                    "content-type": "image/png",
+                    "content-length": png.length,
+                    "cache-control": "no-cache",
+                });
+                response.end(request.method === "HEAD" ? undefined : png);
+
+                return true;
+            } catch {
+                // The folder changed under the request: the file below, as it was.
+            }
+        }
+    }
+
+    if (choice.colors === null) {
         return false;
     }
 
-    const [frame, card, ring1, ring2, pi] = colors as [string, string, string, string, string];
+    const [frame, card, ring1, ring2, pi] = choice.colors as [
+        string,
+        string,
+        string,
+        string,
+        string,
+    ];
     const png = draw(
         {
             frame: `#${frame}`,
@@ -173,45 +291,37 @@ const address = (colors: string[], size: number, maskable = false) => {
 };
 
 /**
- * The home-screen icon's address for the colors in the cookie, or the owner's, or null. iOS may read the icon from the page
- * as served, so the page carries it.
+ * The home-screen icon's address for the design in the cookie, or the owner's, else the colors', or null. iOS may read
+ * the icon from the page as served, so the page carries it.
  */
-export function iconAddress(request: IncomingMessage, dataDir: string): string | null {
-    const design = designFor(request, dataDir);
-
-    if (design !== null) {
-        return design.touch;
+export function iconAddress(choice: IconChoice): string | null {
+    if (choice.design !== null) {
+        return choice.design.touch;
     }
 
-    const colors = cookieColors(request, dataDir);
-
-    return colors === null ? null : address(colors, 180);
+    return choice.colors === null ? null : address(choice.colors, 180);
 }
 
 /** The tab's icon for the design in the cookie, or null for the page's own (`web/icon.svg`). */
-export function tabAddress(request: IncomingMessage, dataDir: string): string | null {
-    return designFor(request, dataDir)?.tab ?? null;
+export function tabAddress(choice: IconChoice): string | null {
+    return choice.design?.tab ?? null;
 }
 
 /**
  * The web app manifest with the icons and colors of the cookie, or null without one (the file is served as it is).
  * iOS and Android read the manifest's icons too, and an icon there that is not the page's own wins over it.
  */
-export function manifestFor(
-    request: IncomingMessage,
-    file: string,
-    dataDir: string,
-): string | null {
-    const design = designFor(request, dataDir);
-
-    if (design !== null) {
+export function manifestFor(file: string, choice: IconChoice): string | null {
+    if (choice.design !== null) {
         return JSON.stringify({
             ...(JSON.parse(file) as Record<string, unknown>),
-            icons: design.icons,
+            background_color: choice.design.background,
+            theme_color: choice.design.background,
+            icons: choice.design.icons,
         });
     }
 
-    const colors = cookieColors(request, dataDir);
+    const colors = choice.colors;
 
     if (colors === null) {
         return null;
@@ -229,6 +339,6 @@ export function manifestFor(
         ...manifest,
         background_color: `#${colors[0]}`,
         theme_color: `#${colors[0]}`,
-        icons: [icon(192, false), icon(192, true)],
+        icons: [icon(192, false), icon(512, false), icon(512, true)],
     });
 }

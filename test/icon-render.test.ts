@@ -120,18 +120,22 @@ test("a size is kept in range, and a color that is not hex is refused", () => {
 });
 
 test("the page carries the icon address of the colors in the cookie, and no other", async () => {
-    const { iconAddress } = await import("../src/server/http/icon-route.ts");
+    const { iconAddress, iconChoice } = await import("../src/server/http/icon-route.ts");
     const request = (cookie?: string) =>
         ({ headers: cookie === undefined ? {} : { cookie } }) as never;
 
     assert.equal(
-        iconAddress(request("a=1; pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"), dataDir),
+        iconAddress(
+            iconChoice(request("a=1; pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"), dataDir),
+        ),
         "/app-icon.png?frame=070707&card=000&ring1=b0b0b0&ring2=b6b6b6&pi=b9b9b9&size=180",
     );
-    assert.equal(iconAddress(request(), dataDir), null, "no cookie");
-    assert.equal(iconAddress(request("pocket_icon=zz"), dataDir), null, "not colors");
+    assert.equal(iconAddress(iconChoice(request(), dataDir)), null, "no cookie");
+    assert.equal(iconAddress(iconChoice(request("pocket_icon=zz"), dataDir)), null, "not colors");
     assert.equal(
-        iconAddress(request('pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"><script>'), dataDir),
+        iconAddress(
+            iconChoice(request('pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"><script>'), dataDir),
+        ),
         null,
         "nothing but the colors reaches the page",
     );
@@ -154,7 +158,7 @@ test("a maskable icon fills the square with the frame's color and keeps the art 
 });
 
 test("the manifest takes the icons and colors of the cookie, and is left alone without one", async () => {
-    const { manifestFor } = await import("../src/server/http/icon-route.ts");
+    const { iconChoice, manifestFor } = await import("../src/server/http/icon-route.ts");
     const file = JSON.stringify({
         name: "Pi Pocket",
         icons: [{ src: "/icon.svg" }],
@@ -163,47 +167,61 @@ test("the manifest takes the icons and colors of the cookie, and is left alone w
     const request = (cookie?: string) =>
         ({ headers: cookie === undefined ? {} : { cookie } }) as never;
 
-    assert.equal(manifestFor(request(), file, dataDir), null, "the static file is served");
+    assert.equal(
+        manifestFor(file, iconChoice(request(), dataDir)),
+        null,
+        "the static file is served",
+    );
 
     const made = JSON.parse(
-        manifestFor(request("pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"), file, dataDir)!,
+        manifestFor(
+            file,
+            iconChoice(request("pocket_icon=070707.000.b0b0b0.b6b6b6.b9b9b9"), dataDir),
+        )!,
     );
 
     assert.equal(made.name, "Pi Pocket", "the rest stays");
     assert.equal(made.theme_color, "#070707");
     assert.deepEqual(
-        made.icons.map((icon: { sizes: string; purpose?: string }) => [icon.sizes, icon.purpose]),
+        made.icons.map((icon: { sizes: string; purpose?: string; src: string }) => [
+            icon.sizes,
+            icon.purpose,
+            /maskable=1/.test(icon.src),
+        ]),
         [
-            ["192x192", undefined],
-            ["192x192", "maskable"],
+            ["192x192", undefined, false],
+            ["512x512", undefined, false],
+            ["512x512", "maskable", true],
         ],
     );
-    assert.match(made.icons[1].src, /pi=b9b9b9.*maskable=1/);
+    assert.match(made.icons[0].src, /size=192/);
+    assert.match(made.icons[2].src, /pi=b9b9b9.*maskable=1/);
 });
 
 test("the owner's colors serve a request with no cookie, and the cookie still wins", async () => {
     const { storeIcon, storedIcon } = await import("../src/server/icon-store.ts");
-    const { iconAddress, manifestFor } = await import("../src/server/http/icon-route.ts");
+    const { iconAddress, iconChoice, manifestFor } =
+        await import("../src/server/http/icon-route.ts");
     const request = (cookie?: string) =>
         ({ headers: cookie === undefined ? {} : { cookie } }) as never;
 
     assert.equal(storedIcon(dataDir).colors, null, "nothing stored yet");
-    assert.equal(iconAddress(request(), dataDir), null);
+    assert.equal(iconAddress(iconChoice(request(), dataDir)), null);
 
     storeIcon(dataDir, "070707.000.b0b0b0.b6b6b6.b9b9b9", null);
 
     assert.deepEqual(storedIcon(dataDir).colors, ["070707", "000", "b0b0b0", "b6b6b6", "b9b9b9"]);
     assert.match(
-        iconAddress(request(), dataDir)!,
+        iconAddress(iconChoice(request(), dataDir))!,
         /frame=070707.*pi=b9b9b9/,
         "no cookie: the owner's colors",
     );
     assert.match(
-        iconAddress(request("pocket_icon=111.222.333.444.555"), dataDir)!,
+        iconAddress(iconChoice(request("pocket_icon=111.222.333.444.555"), dataDir))!,
         /frame=111/,
         "a cookie wins",
     );
-    assert.ok(manifestFor(request(), "{}", dataDir), "the manifest too");
+    assert.ok(manifestFor("{}", iconChoice(request(), dataDir)), "the manifest too");
     assert.throws(() => storeIcon(dataDir, "nope", null), TypeError, "only colors are stored");
     assert.throws(
         () => storeIcon(dataDir, "000.000.000.000.000", "Bogus!"),
@@ -212,7 +230,7 @@ test("the owner's colors serve a request with no cookie, and the cookie still wi
     );
 });
 
-test("the icon route draws no more than 192 pixels, and a size that is not a number is a 400", async () => {
+test("the icon route draws no more than 512 pixels, and a size that is not a number is a 400", async () => {
     const { iconRoute } = await import("../src/server/http/icon-route.ts");
 
     const get = (query: string) => {
@@ -224,8 +242,8 @@ test("the icon route draws no more than 192 pixels, and a size that is not a num
         return decode(body).size;
     };
 
-    assert.equal(get("size=99999"), 192);
-    assert.equal(get("size=99999"), 192, "the second one comes from the cache");
+    assert.equal(get("size=99999"), 512);
+    assert.equal(get("size=99999"), 512, "the second one comes from the cache");
     assert.throws(() => get("size=abc"), { status: 400 });
     assert.throws(() => get("size=Infinity"), { status: 400 });
 });

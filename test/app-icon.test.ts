@@ -5,8 +5,13 @@ type Vars = Record<string, string>;
 
 // A web module, loaded as the browser loads it; its path as a value keeps the type checker from looking for types.
 const ICON: string = "../web/app-icon.js";
-const { iconSvg } = (await import(ICON)) as {
+const { iconSvg, ORIGINAL_COLORS, ORIGINAL_DESIGN } = (await import(ICON)) as {
     iconSvg(vars: Vars, options?: { maskable?: boolean }): string;
+    ORIGINAL_COLORS: Vars;
+    ORIGINAL_DESIGN: { id: string; name: string; detail: string; thumb: string };
+};
+const { APP_ICON } = (await import("../src/server/icon-render.ts")) as {
+    APP_ICON: Record<string, string>;
 };
 
 // Vantablack's palette as theme.js's `themeVars` maps it (theme.js needs a page, so the variables are written out).
@@ -47,6 +52,32 @@ test("a palette that lacks a color keeps the app's own icon color there", () => 
 
     assert.match(svg, /fill="#ff9e64"/, "the π falls back to the app's orange");
     assert.doesNotMatch(svg, /undefined/);
+});
+
+test("the app's own icon has the same colors in the page and in the server's drawing", () => {
+    assert.deepEqual(
+        {
+            frame: ORIGINAL_COLORS["--o-bg-darker"],
+            card: ORIGINAL_COLORS["--o-bg"],
+            ring1: ORIGINAL_COLORS["--o-cyan"],
+            ring2: ORIGINAL_COLORS["--o-green"],
+            pi: ORIGINAL_COLORS["--o-orange"],
+        },
+        APP_ICON,
+        "web/app-icon.js's fixed colors are icon-render.ts's APP_ICON",
+    );
+});
+
+test("the app's own icon is the first card, with no theme in its picture", () => {
+    assert.equal(ORIGINAL_DESIGN.id, "original");
+    assert.equal(ORIGINAL_DESIGN.name, "Original");
+    assert.equal(ORIGINAL_DESIGN.detail, "The app's own π icon");
+    assert.match(ORIGINAL_DESIGN.thumb, /^data:image\/svg\+xml,/);
+
+    const svg = decodeURIComponent(ORIGINAL_DESIGN.thumb.slice("data:image/svg+xml,".length));
+
+    assert.equal(svg, iconSvg(ORIGINAL_COLORS), "its fixed charcoal colors, not the theme's");
+    assert.doesNotMatch(svg, /#000000|#ffffff/i, "not a black or white placeholder");
 });
 
 test("the drawing is that of icon.svg, so the two do not drift", async () => {

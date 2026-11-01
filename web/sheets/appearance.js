@@ -32,7 +32,7 @@ import {
     STEP_TEXT,
 } from "../theme.js";
 import { arranged, move, resetSlot, setShown, SLOTS } from "../slots.js";
-import { DESIGNS } from "../app-icon.js";
+import { loadDesigns, ORIGINAL_DESIGN } from "../app-icon.js";
 import { html, Icon, Sheet, Switch } from "../ui.js";
 import { galleryAvailable } from "./gallery.js";
 
@@ -634,6 +634,49 @@ function DesignCard({ design }) {
     </button>`;
 }
 
+/**
+ * The App icon grid: the app's own icon, then the designs the server lists (`GET /api/icon-designs`). Until the list
+ * arrives, or if it cannot be read, only the app's own icon is offered. Its colors can follow the theme; a design's
+ * cannot.
+ */
+function AppIcons() {
+    const p = prefs();
+    const [designs, setDesigns] = useState(null);
+
+    useEffect(() => {
+        let live = true;
+
+        void loadDesigns().then((list) => {
+            if (live) {
+                setDesigns(list);
+            }
+        });
+
+        return () => {
+            live = false;
+        };
+    }, []);
+
+    const cards = [ORIGINAL_DESIGN, ...(designs ?? [])];
+
+    return html`<div class="icon-grid">
+            ${cards.map((design) => html`<${DesignCard} key=${design.id} design=${design} />`)}
+        </div>
+        ${
+            p.iconDesign === "original" &&
+            html`<${SettingRow}
+                title="Match the theme's colors"
+                detail="Off keeps the charcoal icon whatever theme you use"
+            >
+                <${Switch}
+                    on=${p.iconFollowsTheme === true}
+                    label="Match the theme's colors"
+                    onChange=${() => setPrefs({ iconFollowsTheme: !p.iconFollowsTheme })}
+                />
+            <//>`
+        }`;
+}
+
 export function AppearanceSheet() {
     const p = prefs();
     const desktop = store.state.desktopTheme;
@@ -657,9 +700,7 @@ export function AppearanceSheet() {
         ${store.state.me?.role === "owner" && html`<${ColorsTools} />`}
         ${store.state.me?.role === "owner" && html`<${DefaultTools} />`}
         <div class="label">App icon</div>
-        <div class="icon-grid">
-            ${DESIGNS.map((design) => html`<${DesignCard} key=${design.id} design=${design} />`)}
-        </div>
+        <${AppIcons} />
         <p class="muted small">
             The tab's icon and this device's notifications change at once. A home screen keeps the icon it was added
             with: add it again to change it.

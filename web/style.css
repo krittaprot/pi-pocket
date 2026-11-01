@@ -12055,6 +12055,13 @@ textarea.notes {
     text-align: center;
 }
 
+/* The app's own icon's colors: a row of its own under the grid, while it is the one chosen. */
+.icon-grid + .setting-row {
+    margin-top: 10px;
+    border: 1px solid var(--hair-2);
+    border-radius: var(--r-card);
+}
+
 .look-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

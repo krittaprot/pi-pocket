@@ -11,7 +11,16 @@ import { describe, HttpError } from "./errors.ts";
 import { createApi } from "./http/api.ts";
 import { artifact } from "./http/artifacts.ts";
 import { publicArtifactBundle } from "./http/artifact-assets.ts";
-import { appleTouchIcon, iconAddress, iconRoute, manifestFor, tabAddress } from "./http/icon-route.ts";
+import {
+    appleTouchIcon,
+    type IconChoice,
+    iconAddress,
+    iconChoice,
+    iconRoute,
+    iconsRoute,
+    manifestFor,
+    tabAddress,
+} from "./http/icon-route.ts";
 import { extensionFile } from "./http/extension-routes.ts";
 import { hookRoute } from "./http/hook-routes.ts";
 import { linkRoute } from "./http/link-routes.ts";
@@ -40,6 +49,11 @@ export function createHandler(options: HttpOptions) {
             const parts = path.split("/").filter((part) => part !== "");
 
             response.setHeader("x-content-type-options", "nosniff");
+
+            // The design and colors this request's cookies choose, resolved once: the page's links, the home screen's
+            // icon, and the manifest all read it.
+            let choice: IconChoice | undefined;
+            const icons = () => (choice ??= iconChoice(request, app.dataDir));
 
             if (parts[0] === "api") {
                 return await api(request, response, url, parts.slice(1));
@@ -94,6 +108,12 @@ export function createHandler(options: HttpOptions) {
                 return themeFile(app, request, response, parts.slice(1), auth.user(request));
             }
 
+            // An app icon design's files (`icon-designs.ts`): the app's own under web/icons/, the owner's under the
+            // data folder's, at a versioned address.
+            if (parts[0] === "icons") {
+                return iconsRoute(request, response, parts.slice(1), app.dataDir);
+            }
+
             if (parts[0] === "vendor" && parts[1] !== undefined && VENDOR[parts[1]] !== undefined) {
                 return await serveFile(
                     request,
@@ -108,26 +128,25 @@ export function createHandler(options: HttpOptions) {
                 return iconRoute(request, response, url);
             }
 
-            // The icon a phone fetches itself, in the owner's colors (`icon-store.ts`).
+            // The icon a phone fetches itself: the design's own bytes, else the owner's colors (`icon-store.ts`).
             if (
                 parts.length === 1 &&
                 parts[0] === "apple-touch-icon.png" &&
                 (request.method === "GET" || request.method === "HEAD") &&
-                appleTouchIcon(request, response, app.dataDir)
+                appleTouchIcon(request, response, icons())
             ) {
                 return;
             }
 
-            // The manifest, with the icons of the colors this browser chose when it has chosen (`http/icon-route.ts`).
+            // The manifest, with the icons of the design or colors this browser chose when it has chosen.
             if (
                 parts.length === 1 &&
                 parts[0] === "manifest.webmanifest" &&
                 request.method === "GET"
             ) {
                 const body = manifestFor(
-                    request,
                     readFileSync(join(WEB, "manifest.webmanifest"), "utf8"),
-                    app.dataDir,
+                    icons(),
                 );
 
                 if (body !== null) {
@@ -156,11 +175,7 @@ export function createHandler(options: HttpOptions) {
 
             // The web app: index.html for app routes, files from web/ otherwise.
             if (parts.length === 0 || parts[0] === "s") {
-                return serveApp(
-                    response,
-                    iconAddress(request, app.dataDir),
-                    tabAddress(request, app.dataDir),
-                );
+                return serveApp(response, iconAddress(icons()), tabAddress(icons()));
             }
 
             const file = normalize(join(WEB, ...parts));
@@ -170,11 +185,7 @@ export function createHandler(options: HttpOptions) {
             }
 
             if (file === join(WEB, "index.html")) {
-                return serveApp(
-                    response,
-                    iconAddress(request, app.dataDir),
-                    tabAddress(request, app.dataDir),
-                );
+                return serveApp(response, iconAddress(icons()), tabAddress(icons()));
             }
 
             return await serveFile(request, response, file);

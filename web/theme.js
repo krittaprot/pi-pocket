@@ -3,6 +3,7 @@
 // density, and the sidebar's shape. Saved per browser. index.html applies the last look before the first paint from
 // `pocket.themeCache`, the theme's stylesheets included, so a reload never flashes another look.
 import { applyIcons, reportIconsAs } from "./app-icon.js";
+import { applyStartupImage } from "./startup-image.js";
 import { THEMES } from "./themes.js";
 import { onSafeModeEnd, safeMode } from "./safe-mode.js";
 import { api, store } from "./store.js";
@@ -41,10 +42,16 @@ const DEFAULTS = {
     /** The theme: a theme folder's id, or "pocket", the app's own look. */
     look: BASE_LOOK,
     /**
-     * The app's icon, a design of `app-icon.js`: "original" draws it in the colors in use, and any other is the files of
-     * `web/icons/<id>/`. The tab's icon and this device's notifications change; a home screen keeps what it was added with.
+     * The app's icon, a design the server lists (`icon-designs.ts`): "original" is the app's own icon, and any other is
+     * the files of `web/icons/<id>/` or of the data folder's `icons/<id>/`. The tab's icon and this device's
+     * notifications change; a home screen keeps what it was added with.
      */
     iconDesign: "original",
+    /**
+     * Whether the app's own icon takes the colors in use. Off, it keeps its charcoal colors whatever theme is chosen; a
+     * chosen design does not follow the theme either way.
+     */
+    iconFollowsTheme: false,
     /** Wide screens: the sidebar and the conversation as Hyprland windows, with gaps and borders. */
     tiling: true,
     /** The desktop's wallpaper in the gaps, when following the desktop. */
@@ -651,7 +658,9 @@ export function apply() {
     Object.assign(root.dataset, attrs);
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", vars["--o-bg"]);
     document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", attrs.mode);
-    applyIcons(vars, p.iconDesign);
+    applyIcons(vars, p.iconDesign, p.iconFollowsTheme === true);
+    // iOS shows this while the installed app starts: the theme's background, not a white screen.
+    applyStartupImage(vars["--o-bg"]);
     // In safe mode, or before the list, the theme's stylesheets stay as the cache has them, for the next load.
     const css = sheets === null || safeMode() ? (cached.css ?? []) : sheets;
     const fonts = sheets === null || safeMode() ? (cached.fonts ?? []) : (lookOf()?.fonts ?? []);
