@@ -10,6 +10,9 @@
         <meta name="theme-color" content="#13141c" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <!-- Keep: an iPhone app installed without black-translucent gets a short viewport from iOS, a band at the
+             bottom, until it is reinstalled (WebKit bug 316008). -->
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="format-detection" content="telephone=no" />
         <title>Pi Pocket</title>
         <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
