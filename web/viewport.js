@@ -5,7 +5,9 @@
 const MOST_MISSING = 100; // a status bar, at most; a keyboard takes more, and then 100dvh is left alone
 
 export function startViewportFix() {
-    if (navigator.standalone !== true) {return;}
+    if (navigator.standalone !== true) {
+        return;
+    }
 
     const root = document.documentElement;
     const probe = document.createElement("div");
