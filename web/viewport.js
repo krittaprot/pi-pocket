@@ -21,7 +21,7 @@ export function startViewportFix() {
         // bars keep their titles below the blur.
         const statusBar = parseFloat(getComputedStyle(probe).paddingTop) > 0;
 
-        root.style.setProperty("--top-room", statusBar ? "24px" : "0px");
+        root.style.setProperty("--top-room", statusBar ? "12px" : "0px");
         const portrait = matchMedia("(orientation: portrait)").matches;
         const short = Math.min(screen.width, screen.height);
         const long = Math.max(screen.width, screen.height);
