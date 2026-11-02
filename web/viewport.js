@@ -13,10 +13,15 @@ export function startViewportFix() {
     const probe = document.createElement("div");
 
     probe.style.cssText =
-        "position:fixed;top:0;left:0;width:0;height:100dvh;visibility:hidden;pointer-events:none";
+        "position:fixed;top:0;left:0;width:0;height:100dvh;padding-top:env(safe-area-inset-top);box-sizing:border-box;visibility:hidden;pointer-events:none";
     document.body.append(probe);
 
     const fit = () => {
+        // iOS blurs the top of a home-screen app, a little below the status bar too: with a status bar there, the top
+        // bars keep their titles below the blur.
+        const statusBar = parseFloat(getComputedStyle(probe).paddingTop) > 0;
+
+        root.style.setProperty("--top-room", statusBar ? "24px" : "0px");
         const portrait = matchMedia("(orientation: portrait)").matches;
         const short = Math.min(screen.width, screen.height);
         const long = Math.max(screen.width, screen.height);
