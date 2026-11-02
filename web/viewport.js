@@ -34,7 +34,21 @@ export function startViewportFix() {
         }
     };
 
-    fit();
-    addEventListener("resize", fit);
-    addEventListener("orientationchange", () => setTimeout(fit, 300));
+    // iOS settles the viewport after a keyboard closes or a rotation without always firing resize: check again
+    // a few times after each change.
+    let timers = [];
+
+    const settle = () => {
+        timers.forEach(clearTimeout);
+        fit();
+        timers = [100, 300, 700].map((ms) => setTimeout(fit, ms));
+    };
+
+    settle();
+    addEventListener("resize", settle);
+    visualViewport?.addEventListener("resize", settle);
+    addEventListener("orientationchange", settle);
+    addEventListener("pageshow", settle);
+    document.addEventListener("focusout", settle);
+    document.addEventListener("visibilitychange", settle);
 }
