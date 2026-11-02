@@ -5229,6 +5229,16 @@ pre.diff .del {
     padding: 0 4px 4px;
 }
 
+/* The list runs to the screen's bottom edge, under the home indicator, and keeps that room inside, below its last
+   row: the panel's own room there would cut rows off in midair. */
+.sessions:has(> .session-items:last-child) {
+    padding-bottom: 0;
+}
+
+.sessions > .session-items:last-child {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+}
+
 .session-items:focus-visible {
     outline-offset: -2px;
 }
