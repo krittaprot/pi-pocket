@@ -20,6 +20,7 @@ import { startEdgeBack, startSwipes, useDragToClose } from "./gestures.js";
 import { Splash } from "./home.js";
 import { Launcher } from "./launcher.js";
 import { registerWorker, updateBadge } from "./notify.js";
+import { startViewportFix } from "./viewport.js";
 import {
     PEEK_WIDE,
     PeekHost,
@@ -942,6 +943,7 @@ store.subscribe(() => {
     });
 });
 render(html`<${App} />`, root);
+startViewportFix();
 
 // A notification's link can ask for the chat: `/s/12?chat=1`.
 if (new URLSearchParams(location.search).has("chat")) {
