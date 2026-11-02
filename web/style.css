@@ -823,9 +823,6 @@ kbd {
 :root {
     --inset-l: env(safe-area-inset-left);
     --inset-r: env(safe-area-inset-right);
-    /* The status bar's room, and more in an iPhone's home-screen app (--top-room, viewport.js), where iOS blurs what
-       sits just below the status bar. */
-    --inset-t: calc(env(safe-area-inset-top) + var(--top-room, 0px));
 }
 
 @media (min-width: 960px) {
@@ -1083,8 +1080,8 @@ kbd {
     display: flex;
     align-items: center;
     gap: 6px;
-    min-height: calc(46px + 12px * var(--space-y) + var(--inset-t));
-    padding: var(--inset-t) var(--inset-r) 0 var(--inset-l);
+    min-height: calc(46px + 12px * var(--space-y) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) var(--inset-r) 0 var(--inset-l);
     border-bottom: 1px solid var(--hair);
     background: var(--bg);
 }
@@ -1118,7 +1115,8 @@ kbd {
     flex: none;
     display: flex;
     gap: 5px;
-    padding: calc(var(--inset-t) + 6px) calc(var(--inset-r) + 20px) 0 calc(var(--inset-l) + 20px);
+    padding: calc(env(safe-area-inset-top) + 6px) calc(var(--inset-r) + 20px) 0
+        calc(var(--inset-l) + 20px);
     background: var(--bg);
     overflow-x: auto;
     scrollbar-width: none;
@@ -1228,7 +1226,7 @@ kbd {
 @media (min-width: 700px) {
     .tabstrip {
         gap: 8px;
-        padding-top: calc(var(--inset-t) + 10px);
+        padding-top: calc(env(safe-area-inset-top) + 10px);
     }
 
     .tabstrip-name {
@@ -4642,7 +4640,7 @@ pre.diff .del {
     align-items: center;
     gap: 6px;
     min-height: 0;
-    padding: calc(var(--inset-t) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);
+    padding: calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);
     border-right: 1px solid var(--hair);
     /* A rail with more buttons than room (a short screen, many extensions) scrolls as a whole rather than cut off its
        last buttons; its hidden scrollbar's place is taken by a fade at the edge where more is (below). */
@@ -4959,7 +4957,7 @@ pre.diff .del {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: calc(var(--inset-t) + 14px) 12px calc(env(safe-area-inset-bottom) + 10px);
+    padding: calc(env(safe-area-inset-top) + 14px) 12px calc(env(safe-area-inset-bottom) + 10px);
     container: sessions / inline-size;
 }
 
@@ -8688,7 +8686,7 @@ div.group-head {
     align-items: center;
     gap: 8px;
     min-height: 58px;
-    padding: calc(var(--inset-t) + 8px) 10px 8px 20px;
+    padding: calc(env(safe-area-inset-top) + 8px) 10px 8px 20px;
     border-bottom: 1px solid var(--hair);
 }
 
@@ -8914,7 +8912,7 @@ div.group-head {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: calc(var(--inset-t) + 3.2rem) calc(0.5rem + env(safe-area-inset-right))
+    padding: calc(env(safe-area-inset-top) + 3.2rem) calc(0.5rem + env(safe-area-inset-right))
         calc(env(safe-area-inset-bottom) + 0.5rem) calc(0.5rem + env(safe-area-inset-left));
     animation: fade var(--t-fade) var(--ease-almost);
     cursor: zoom-out;
@@ -8940,8 +8938,8 @@ div.group-head {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: calc(var(--inset-t) + 0.4rem) calc(0.4rem + env(safe-area-inset-right)) 0.4rem
-        calc(0.9rem + env(safe-area-inset-left));
+    padding: calc(env(safe-area-inset-top) + 0.4rem) calc(0.4rem + env(safe-area-inset-right))
+        0.4rem calc(0.9rem + env(safe-area-inset-left));
     background: linear-gradient(color-mix(in srgb, var(--desk) 80%, transparent), transparent);
     cursor: default;
 }
@@ -8965,7 +8963,7 @@ div.group-head {
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    top: calc(var(--inset-t) + 0.6rem);
+    top: calc(env(safe-area-inset-top) + 0.6rem);
     z-index: 40;
     display: flex;
     flex-direction: column;
@@ -11318,7 +11316,7 @@ textarea.notes {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: calc(var(--inset-t) + 11vh) 10px 10px;
+    padding: calc(env(safe-area-inset-top) + 11vh) 10px 10px;
     background: var(--scrim);
     animation: fade var(--t-fade) var(--ease-almost);
 }
@@ -11705,11 +11703,12 @@ textarea.notes {
 
 @media (pointer: coarse) {
     .launcher-overlay {
-        padding: calc(var(--inset-t) + 16px) 8px calc(env(safe-area-inset-bottom) + 16px);
+        padding: calc(env(safe-area-inset-top) + 16px) 8px calc(env(safe-area-inset-bottom) + 16px);
     }
     .launcher {
         max-height: calc(
-            var(--app-height, 100dvh) - var(--inset-t) - env(safe-area-inset-bottom) - 32px
+            var(--app-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) -
+                32px
         );
     }
     .launcher-input {
@@ -11761,7 +11760,8 @@ textarea.notes {
 @media (max-width: 699px) {
     .launcher-overlay {
         align-items: flex-end;
-        padding: calc(var(--inset-t) + 24px) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+        padding: calc(env(safe-area-inset-top) + 24px) env(safe-area-inset-right) 0
+            env(safe-area-inset-left);
     }
     .launcher {
         position: relative;
@@ -14074,8 +14074,8 @@ textarea.notes {
     align-items: center;
     gap: 8px;
     flex: none;
-    height: calc(58px + var(--inset-t));
-    padding: var(--inset-t) 10px 0 14px;
+    height: calc(58px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 10px 0 14px;
     border-bottom: 1px solid var(--hair);
 }
 
@@ -14130,8 +14130,8 @@ textarea.notes {
     align-items: center;
     gap: 8px;
     flex: none;
-    height: calc(58px + var(--inset-t));
-    padding: var(--inset-t) 10px 0 14px;
+    height: calc(58px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 10px 0 14px;
     border-bottom: 1px solid var(--hair);
 }
 
@@ -14509,7 +14509,7 @@ textarea.notes {
     gap: 4px;
     min-height: 58px;
     flex: none;
-    padding: var(--inset-t) 8px 0 10px;
+    padding: env(safe-area-inset-top) 8px 0 10px;
     border-bottom: 1px solid var(--hair);
     background: var(--bg);
 }
@@ -15741,7 +15741,7 @@ textarea.notes {
 }
 
 .ft:not(.side) > .ft-view > .ft-view-head {
-    padding-top: var(--inset-t);
+    padding-top: env(safe-area-inset-top);
 }
 
 /* Docked beside the conversation, the tile keeps its tabs and its close button above the file. */
@@ -16708,7 +16708,7 @@ textarea.notes {
     align-items: center;
     gap: 12px;
     min-height: 62px;
-    padding: var(--inset-t) calc(12px + var(--inset-r)) 0 calc(22px + var(--inset-l));
+    padding: env(safe-area-inset-top) calc(12px + var(--inset-r)) 0 calc(22px + var(--inset-l));
     border-bottom: 1px solid var(--hair);
 }
 
@@ -17536,7 +17536,10 @@ textarea.notes {
  * corner. On phones it is a sheet from the bottom edge, over a light scrim.
  */
 .pip-panel {
-    --pip-top: max(calc(var(--gap-out) + var(--inset-t)), calc(var(--topbar-h, 0px) + 6px));
+    --pip-top: max(
+        calc(var(--gap-out) + env(safe-area-inset-top)),
+        calc(var(--topbar-h, 0px) + 6px)
+    );
     position: fixed;
     right: calc(16px + env(safe-area-inset-right));
     bottom: calc(16px + env(safe-area-inset-bottom));
@@ -18238,7 +18241,7 @@ textarea.notes {
         bottom: 0;
         width: 100%;
         height: 86dvh;
-        max-height: calc(var(--app-height, 100dvh) - var(--inset-t));
+        max-height: calc(var(--app-height, 100dvh) - env(safe-area-inset-top));
         border: 0;
         border-radius: calc(var(--r-sheet) + 8px) calc(var(--r-sheet) + 8px) 0 0;
         background: var(--bg);
