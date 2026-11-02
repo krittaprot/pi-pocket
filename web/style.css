@@ -390,6 +390,16 @@ body {
     height: 100dvh;
 }
 
+/* Installed on an iPhone, iOS 26 measures 100dvh short of the screen (WebKit bug 316008), and the desk shows
+ * below the app as a dark band. Pinned to the viewport's four edges instead, the app reaches the bottom. */
+@media (display-mode: standalone) {
+    #app {
+        position: fixed;
+        inset: 0;
+        height: auto;
+    }
+}
+
 button,
 input,
 textarea,
