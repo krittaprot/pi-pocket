@@ -1,4 +1,12 @@
-import { type App, cleanUp, newSession, openApp, root, scriptedModel, until } from "./helpers.ts";
+import {
+    type App,
+    cleanUp,
+    writtenSession,
+    openApp,
+    root,
+    scriptedModel,
+    until,
+} from "./helpers.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -75,8 +83,8 @@ before(async () => {
     }
 
     app = await openApp(scriptedModel());
-    one = await newSession(app);
-    two = await newSession(app);
+    one = await writtenSession(app);
+    two = await writtenSession(app);
     const handler = createHandler({
         app,
         listen: { host: "127.0.0.1", port: 0 },

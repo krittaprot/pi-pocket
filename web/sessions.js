@@ -31,6 +31,7 @@ import {
     setUnread,
     stillMoving,
     store,
+    unstarted,
     workspaceOrder,
     foldsNow,
     toggleFoldedLinked,
@@ -1353,6 +1354,7 @@ function AllSessions({ compact = false }) {
         const shown = sessions.filter(
             (session) =>
                 Boolean(session.archived) === archived &&
+                !unstarted(session) &&
                 (needle === "" ||
                     `${session.title ?? ""} ${session.cwd} ${shortPath(session.cwd, home)} ${session.model ?? ""} ${sessionWords(session).join(" ")}`
                         .toLowerCase()
@@ -1951,7 +1953,10 @@ function AllSessions({ compact = false }) {
         [sessions, unread, peekSeen, store.state.server],
     );
     const tabBar = useSlide(tabs, "button.on", "x", `${tab}:${needCount}`);
-    const count = useMemo(() => sessions.filter((session) => !session.archived).length, [sessions]);
+    const count = useMemo(
+        () => sessions.filter((session) => !session.archived && !unstarted(session)).length,
+        [sessions, store.state.conversationId],
+    );
     const filters = sessionFilters();
     const steers = canSteer();
     // Made again only when extensions or this person's steering change: rows keep the same action while they do not.

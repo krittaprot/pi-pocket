@@ -1,5 +1,13 @@
 // Session-row actions in a dedicated headless browser, with isolated app data and a scripted model.
-import { type App, cleanUp, newSession, openApp, root, scriptedModel, until } from "./helpers.ts";
+import {
+    type App,
+    cleanUp,
+    writtenSession,
+    openApp,
+    root,
+    scriptedModel,
+    until,
+} from "./helpers.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -86,11 +94,11 @@ before(async () => {
     }
 
     app = await openApp(scriptedModel());
-    active = await newSession(app);
+    active = await writtenSession(app);
     const cwd = join(root, longFolder);
 
     mkdirSync(cwd);
-    folderSessions = [await newSession(app, cwd)];
+    folderSessions = [await writtenSession(app, cwd)];
     server = createServer(
         createHandler({ app, listen: { host: "127.0.0.1", port: 0 }, restart: () => {} }),
     );
@@ -520,8 +528,8 @@ test(
     "a fold hides linked sessions at once, from the list and the numbers, but never above the open one",
     real,
     async () => {
-        const parent = await newSession(app);
-        const kids = [await newSession(app), await newSession(app)];
+        const parent = await writtenSession(app);
+        const kids = [await writtenSession(app), await writtenSession(app)];
 
         // Started by the parent, as a linked session is (`team`).
         await app.harness.commit(async (tx) => {

@@ -101,6 +101,9 @@ before(async () => {
     app = await openApp(scriptedModel());
     first = await newSession(app);
     second = await newSession(app);
+    // Sessions nobody has written in yet stay out of the list: these two have been, as far as their titles go.
+    await app.commands.updateSession(first, owner(app), { title: "First" });
+    await app.commands.updateSession(second, owner(app), { title: "Second" });
     await app.setExtensionEnabled(owner(app), "labels.ts", true);
     server = createServer(
         createHandler({ app, listen: { host: "127.0.0.1", port: 0 }, restart: () => {} }),
@@ -364,7 +367,8 @@ test(
         );
         await inPage(`globalThis.labelsFilter.update({ match: null }); return "null"`);
         await page.navigate(`${base}/`);
-        await until(async () => (await rows()).length === 3, "the three sessions");
+        // The new one, left without a message, leaves the list with it: the two from before stay.
+        await until(async () => (await rows()).length === 2, "the two sessions written in");
     },
 );
 
@@ -390,7 +394,7 @@ test("async session readers report a module error without hiding the list", real
             "the async reader's module stopped",
         );
         await search("");
-        await until(async () => (await rows()).length === 3, "a bad reader does not hide sessions");
+        await until(async () => (await rows()).length === 2, "a bad reader does not hide sessions");
         assert.equal(
             await inPage<boolean>(
                 `return JSON.stringify(document.body.textContent.includes("must return its value directly, not a promise"))`,
@@ -416,7 +420,7 @@ test("chips that throw stop their module, and the list draws without them", real
             )?.status === "failed",
         "the module stopped",
     );
-    assert.equal((await rows()).length, 3, "the list still shows every session");
+    assert.equal((await rows()).length, 2, "the list still shows every session");
 });
 
 test(

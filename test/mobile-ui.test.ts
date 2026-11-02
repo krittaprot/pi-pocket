@@ -3,7 +3,7 @@ import {
     cleanUp,
     lastText,
     modelTexts,
-    newSession,
+    writtenSession,
     openApp,
     owner,
     root,
@@ -172,7 +172,7 @@ before(async () => {
         load: async () => undefined,
         save: () => {},
     });
-    first = await newSession(app);
+    first = await writtenSession(app);
     page = await browsers.open(1);
     await page.setViewport(VIEWPORTS.mobile);
     await page.navigate(`${base}/login?token=${encodeURIComponent(app.config.ownerToken)}`);
@@ -259,7 +259,7 @@ test("back closes the open file, then the Files tile, then leaves the session", 
 });
 
 test("local Markdown file links use the viewer", real, async () => {
-    const linked = await newSession(app);
+    const linked = await writtenSession(app);
 
     await say(
         app,
@@ -711,7 +711,7 @@ test("earlier history does not repeat a message kept after compaction", real, as
 });
 
 test("a late earlier-history response stays out of another conversation", real, async () => {
-    const other = await newSession(app);
+    const other = await writtenSession(app);
 
     await compactedView();
     await page.evaluate(`
@@ -991,7 +991,7 @@ test(
     "a session opened before shows again at once, and the server sends only what is new",
     real,
     async () => {
-        const other = await newSession(app);
+        const other = await writtenSession(app);
 
         await say(app, first, "kept here");
         await fresh();
@@ -1118,7 +1118,7 @@ test(
     "a session kept on the device shows after a reload, and the server sends only what is new; another person's, or none when the server says so",
     real,
     async () => {
-        const session = await newSession(app);
+        const session = await writtenSession(app);
         const attach = app.attach.bind(app);
         const attached: { id: number | null; have: string | null }[] = [];
         const onDevice = () =>
@@ -1212,8 +1212,8 @@ test(
     "what came while away slides in: at the bottom it glides up, scrolled up the reader stays put, and Wait for updates holds the session until it comes",
     real,
     async () => {
-        const session = await newSession(app);
-        const other = await newSession(app);
+        const session = await writtenSession(app);
+        const other = await writtenSession(app);
         const long = (n: number) => `${"words to make the row a few lines long ".repeat(6)}${n}`;
 
         for (let n = 1; n <= 8; n++) {
@@ -1371,8 +1371,8 @@ test(
 );
 
 test("a session no longer shared is not kept, whatever the tab hears first", real, async () => {
-    const other = await newSession(app);
-    const theirs = await newSession(app);
+    const other = await writtenSession(app);
+    const theirs = await writtenSession(app);
     const guest = app.config.addUser("Ivy", "guest", [String(theirs), String(other)]);
     // The guest's own browser: the owner's would ask before it switched accounts.
     const owners = page;
@@ -1575,7 +1575,7 @@ test("a call's mark keeps its circle while it waits for an approval", real, asyn
             decision: { action: "ask", reason: "risky", source: "test", terminate: false },
         }) as never;
 
-    const one = await newSession(app);
+    const one = await writtenSession(app);
 
     await fresh();
     await goTo(one);
@@ -1602,7 +1602,7 @@ test("a call's mark keeps its circle while it waits for an approval", real, asyn
 test("Pi's question shows its answers as buttons a thumb can tap", real, async () => {
     // The test before fakes a guard that asks about every call.
     await app.setExtensionEnabled(owner(app), "guard.ts", false);
-    const id = await newSession(app);
+    const id = await writtenSession(app);
     const heights = `return JSON.stringify([...document.querySelectorAll("button.ask-option")].map((b) => b.offsetHeight))`;
 
     await fresh();

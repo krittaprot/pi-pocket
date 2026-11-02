@@ -3,7 +3,15 @@
 import { folderColor } from "./avatar.js";
 import { useEffect, useRef } from "preact/hooks";
 import { sessionMark } from "./sessions.js";
-import { canSteer, navigate, openSheet, scoped, store, workspaceOrder } from "./store.js";
+import {
+    canSteer,
+    navigate,
+    openSheet,
+    scoped,
+    store,
+    unstarted,
+    workspaceOrder,
+} from "./store.js";
 import { lookLabel, prefs } from "./theme.js";
 import { html, Icon, Keys, shortPath, timeAgo } from "./ui.js";
 
@@ -70,7 +78,7 @@ export function Splash() {
         ],
         [
             "sessions",
-            `${sessions.filter((session) => !session.archived).length}${busy > 0 ? `, ${busy} running` : ""}`,
+            `${sessions.filter((session) => !session.archived && !unstarted(session)).length}${busy > 0 ? `, ${busy} running` : ""}`,
         ],
         ["models", String(models.length)],
         ["folder", shortPath(server?.defaultCwd, server?.home) || "~"],

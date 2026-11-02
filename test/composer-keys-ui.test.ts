@@ -1,6 +1,14 @@
 // Keys that extensions give the message boxes (`pocket.composerKey`), in a real Chromium, through a drop-in: Ctrl+W
 // deletes a word and keeps the draft, a key that returns false goes through, and the shortcuts sheet lists them.
-import { type App, cleanUp, newSession, openApp, root, scriptedModel, until } from "./helpers.ts";
+import {
+    type App,
+    cleanUp,
+    writtenSession,
+    openApp,
+    root,
+    scriptedModel,
+    until,
+} from "./helpers.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -91,7 +99,7 @@ before(async () => {
     );
     writeFileSync(join(dropIns, "keys.js"), KEYS_JS);
     app = await openApp(scriptedModel());
-    session = await newSession(app);
+    session = await writtenSession(app);
     await app.setExtensionEnabled(owner(app), "keys.ts", true);
     server = createServer(
         createHandler({ app, listen: { host: "127.0.0.1", port: 0 }, restart: () => {} }),
@@ -278,7 +286,7 @@ test(
     "Alt+↓ in the model menu still switches sessions: the list keeps only plain arrows",
     real,
     async () => {
-        const other = await newSession(app);
+        const other = await writtenSession(app);
 
         await until(
             () =>

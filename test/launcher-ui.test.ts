@@ -3,7 +3,7 @@
 import {
     type App,
     cleanUp,
-    newSession,
+    writtenSession,
     openApp,
     owner,
     root,
@@ -112,7 +112,7 @@ before(async () => {
         const cwd = join(work, `project-${index}`);
 
         mkdirSync(cwd);
-        const id = await newSession(app, cwd);
+        const id = await writtenSession(app, cwd);
 
         sessions.push(id);
         await app.commands.updateSession(id, owner(app), {

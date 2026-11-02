@@ -3,7 +3,7 @@ import {
     cleanUp,
     context,
     lastText,
-    newSession,
+    writtenSession,
     openApp,
     owner,
     root,
@@ -155,9 +155,9 @@ test(
 );
 
 test("calls wait in Needs you, oldest first, and are answered in their rows", real, async () => {
-    const short = await newSession(app);
-    const long = await newSession(app);
-    const quiet = await newSession(app);
+    const short = await writtenSession(app);
+    const long = await writtenSession(app);
+    const quiet = await writtenSession(app);
     const shortAnswer = ask(short, "npm publish --tag beta", 1_000);
     const longAnswer = ask(long, `echo ${"a very long command ".repeat(10)}`, 2_000);
 
@@ -204,7 +204,7 @@ test("calls wait in Needs you, oldest first, and are answered in their rows", re
 });
 
 test("a failed run is dismissed from its row, and goes quiet", real, async () => {
-    const id = await newSession(app);
+    const id = await writtenSession(app);
 
     await app.commands.submit(id, owner(app), { text: "fail now", requestId: "priority-fail" });
     await present(
@@ -226,8 +226,8 @@ test(
     "the open session stays in its group while it is read, and moves when another opens",
     real,
     async () => {
-        const mine = await newSession(app);
-        const other = await newSession(app);
+        const mine = await writtenSession(app);
+        const other = await writtenSession(app);
 
         await page.evaluate(`
         const { setUnread } = await import("/store.js");
@@ -254,7 +254,7 @@ test(
 );
 
 test("a row answers only the call it shows, not one that took its place", real, async () => {
-    const id = await newSession(app);
+    const id = await writtenSession(app);
     const answer = ask(id, "npm publish --tag next", 3_000);
     const allow = `${rowIn("needs", id)} [data-part="session-allow"]`;
 
@@ -294,8 +294,8 @@ test("a row answers only the call it shows, not one that took its place", real, 
 });
 
 test("Undo after Mark all read leaves a session read since as it is", real, async () => {
-    const first = await newSession(app);
-    const second = await newSession(app);
+    const first = await writtenSession(app);
+    const second = await writtenSession(app);
 
     await click('.sidebar .session-tabs [data-tab="priority"]');
     await page.evaluate(`
@@ -324,7 +324,7 @@ test("Undo after Mark all read leaves a session read since as it is", real, asyn
 });
 
 test("an open session that gets a call and has it answered leaves Needs you", real, async () => {
-    const id = await newSession(app);
+    const id = await writtenSession(app);
 
     await click('.sidebar .session-tabs [data-tab="priority"]');
     await app.commands.submit(id, owner(app), { text: "fail now", requestId: "priority-held" });
@@ -353,8 +353,8 @@ test(
     "a session whose linked sessions work is at work too, in Working with a working square",
     real,
     async () => {
-        const parent = await newSession(app);
-        const child = await newSession(app);
+        const parent = await writtenSession(app);
+        const child = await writtenSession(app);
 
         await click('.sidebar .session-tabs [data-tab="priority"]');
         await present(rowIn("quiet", parent), "the parent, quiet");

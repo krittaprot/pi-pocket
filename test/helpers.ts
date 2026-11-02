@@ -148,6 +148,22 @@ export async function newSession(app: App, cwd = work): Promise<ConversationId> 
     return id;
 }
 
+/**
+ * A new session as the session list shows it: one somebody has written in, which the first message titles at once.
+ * The list leaves out sessions nobody has written in yet (`unstarted` in web/store.js), except the one open.
+ */
+export async function writtenSession(
+    app: App,
+    cwd = work,
+    title = "A session",
+): Promise<ConversationId> {
+    const id = await newSession(app, cwd);
+
+    await app.commands.updateSession(id, owner(app), { title });
+
+    return id;
+}
+
 export async function loadTools(app: App, id: ConversationId, ...names: string[]): Promise<void> {
     await (
         await app.conversation(id)

@@ -1,6 +1,6 @@
 // Appearance's session tabs in a headless browser, with isolated app data and a scripted model: the strip shows the
 // numbered sessions, the open one is selected, a tap opens another, and the default (the sidebar) draws no strip.
-import { type App, cleanUp, newSession, openApp, scriptedModel, until } from "./helpers.ts";
+import { type App, cleanUp, writtenSession, openApp, scriptedModel, until } from "./helpers.ts";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -35,7 +35,7 @@ before(async () => {
     }
 
     app = await openApp(scriptedModel());
-    sessions = [await newSession(app), await newSession(app), await newSession(app)];
+    sessions = [await writtenSession(app), await writtenSession(app), await writtenSession(app)];
     server = createServer(
         createHandler({ app, listen: { host: "127.0.0.1", port: 0 }, restart: () => {} }),
     );

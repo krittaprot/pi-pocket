@@ -312,6 +312,25 @@ export function sessionUnread(session, state = store.state) {
 }
 
 /**
+ * A session nobody has sent anything in yet: no title, which the first message gives it at once (`commands.ts`), and
+ * nothing at work. The lists leave these out, as a chat app leaves out a chat never started, except the one open.
+ */
+export function unstarted(session, state = store.state) {
+    return (
+        session.title === undefined &&
+        session.id !== state.conversationId &&
+        session.forkedFrom === undefined &&
+        session.linkedFrom === undefined &&
+        session.linkedOrigin === undefined &&
+        !session.busy &&
+        !session.waiting &&
+        !session.background &&
+        session.subagents === undefined &&
+        session.approval === undefined
+    );
+}
+
+/**
  * Sessions in "workspace" order, as Alt+1…9 and the rail number them: pinned ones first (in the order they were
  * pinned), then the rest, newest first, each followed by the linked sessions under it, as the list shows them
  * (`session-tree.js`). Archived sessions are left out.
@@ -354,7 +373,7 @@ export function sessionOrder(state = store.state) {
 /** Sessions in workspace order, with the linked sessions under `folds` left out. */
 function orderOf(state, folds) {
     const { sessions, pinned: pins } = state;
-    const active = sessions.filter((session) => !session.archived);
+    const active = sessions.filter((session) => !session.archived && !unstarted(session, state));
     const { roots, rows } = sessionForest(active, { pinned: pins });
     const family = (root) => unfolded(rows.get(root.id), folds).map((row) => row.session);
     const byId = new Map(roots.map((root) => [root.id, root]));
