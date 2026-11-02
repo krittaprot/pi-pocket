@@ -1650,8 +1650,12 @@ function opened(record, spec) {
         return page?.module === record.module && page.id === spec.page;
     }
 
+    // A panel counts as open only while it shows: with no session open, it does not.
     return (
-        spec.panel !== undefined && extPanel?.module === record.module && extPanel.id === spec.panel
+        spec.panel !== undefined &&
+        extPanelShown() &&
+        extPanel?.module === record.module &&
+        extPanel.id === spec.panel
     );
 }
 
@@ -1682,6 +1686,29 @@ function activate(record, spec, input, over = false) {
         } else if (spec.sheet !== undefined) {
             openExtensionSheet(record.module, spec.sheet, input, over);
         } else if (spec.panel !== undefined) {
+            // A panel shows beside a session's chat. From the home screen (a phone's, or a desktop with none open), it
+            // opens beside the session used last, rather than wait unseen for one.
+            if (store.state.conversationId === null) {
+                const last = store.state.sessions
+                    .filter((session) => !session.archived)
+                    .reduce(
+                        (best, session) =>
+                            best === null || session.updatedAt > best.updatedAt ? session : best,
+                        null,
+                    );
+
+                if (last === null) {
+                    notify(
+                        "info",
+                        `Open a session to use ${spec.title ?? spec.label ?? record.title}.`,
+                    );
+
+                    return;
+                }
+
+                navigate(last.id);
+            }
+
             openExtPanel(record.module, spec.panel);
         } else if (spec.run !== undefined) {
             Promise.resolve(input === undefined ? spec.run() : spec.run(input)).catch(failed);
